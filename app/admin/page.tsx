@@ -12,14 +12,23 @@ export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sysError, setSysError] = useState(""); // 顯示錯誤用
+  const [sysError, setSysError] = useState("");
+  const [debugInfo, setDebugInfo] = useState(""); // 存放環境變數檢查結果
   const router = useRouter();
 
   useEffect(() => {
+    // 檢查環境變數是否成功載入 (為了安全只顯示前5碼)
+    const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "空";
+    const domain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "空";
+    
+    setDebugInfo(
+      `API Key 狀態: ${key === "空" || key === "未設定" ? "❌ 沒抓到" : `✅ ${key.substring(0, 5)}...`} \n` +
+      `Auth Domain: ${domain}`
+    );
+
     try {
-      // 安全檢查：確認 Firebase 有成功載入
       if (!auth || !auth.onAuthStateChanged) {
-        setSysError("系統抓不到 Firebase 環境變數，請確認 Vercel 是否有 Redeploy。");
+        setSysError("Firebase 未成功初始化");
         return;
       }
 
@@ -40,7 +49,6 @@ export default function AdminDashboard() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      if (!db) throw new Error("Firestore 未初始化");
       const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
       const projData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -54,6 +62,7 @@ export default function AdminDashboard() {
 
   const handleLogin = async () => {
     try {
+      setSysError(""); // 清除舊錯誤
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
     } catch (error: any) {
@@ -66,22 +75,25 @@ export default function AdminDashboard() {
     setProjects([]);
   };
 
-  // 如果有錯誤，直接顯示在螢幕上！
-  if (sysError) {
-    return (
-      <div className="p-8 m-4 bg-red-50 border border-red-200 rounded text-red-600 break-words">
-        <h2 className="font-bold text-lg mb-2">系統發生錯誤</h2>
-        <p>{sysError}</p>
-      </div>
-    );
-  }
-
+  // 尚未登入畫面
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
         <div className="p-8 bg-white rounded-xl shadow-lg border text-center w-full max-w-sm">
           <h1 className="text-2xl font-bold mb-2">管理員登入</h1>
           <p className="text-sm text-gray-500 mb-6">302 檔案上傳管理系統</p>
+          
+          {/* X光機：顯示環境變數狀態 */}
+          <div className="mb-6 p-3 bg-gray-800 text-green-400 text-xs text-left rounded-md font-mono whitespace-pre-wrap break-all">
+            {debugInfo || "載入中..."}
+          </div>
+
+          {sysError && (
+            <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded border border-red-200 break-words text-left">
+              {sysError}
+            </div>
+          )}
+
           <button
             onClick={handleLogin}
             className="w-full bg-blue-600 text-white font-medium py-2.5 rounded-lg hover:bg-blue-700 transition"
@@ -93,6 +105,7 @@ export default function AdminDashboard() {
     );
   }
 
+  // 登入後的專案列表畫面
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-12">
       <div className="max-w-4xl mx-auto">
