@@ -16,9 +16,10 @@ export default function StudentUploadPage({
   const [matchedStudent, setMatchedStudent] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState("");
   
-  // 記錄每個檔案的上傳狀態 (未選擇, 上傳中, 完成, 失敗)
+  // 記錄每個檔案的上傳狀態與詳細錯誤訊息
   const [filesData, setFilesData] = useState<{ [reqId: string]: File | null }>({});
   const [uploadStatus, setUploadStatus] = useState<{ [reqId: string]: string }>({});
+  const [errorDetails, setErrorDetails] = useState<{ [reqId: string]: string }>({});
   const [isUploadingAll, setIsUploadingAll] = useState(false);
 
   useEffect(() => {
@@ -53,6 +54,8 @@ export default function StudentUploadPage({
       const selectedFile = e.target.files[0];
       setFilesData(prev => ({ ...prev, [reqId]: selectedFile }));
       setUploadStatus(prev => ({ ...prev, [reqId]: "selected" }));
+      // 重新選擇檔案時，清空原本的錯誤訊息
+      setErrorDetails(prev => ({ ...prev, [reqId]: "" }));
     }
   };
 
@@ -72,9 +75,10 @@ export default function StudentUploadPage({
       if (!file) continue;
 
       setUploadStatus(prev => ({ ...prev, [req.id]: "uploading" }));
+      setErrorDetails(prev => ({ ...prev, [req.id]: "" }));
 
       try {
-        // 1. 取得預先簽名網址 (改用 /api/sign)
+        // 1. 取得預先簽名網址
         const urlRes = await fetch("/api/sign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -86,14 +90,27 @@ export default function StudentUploadPage({
             reqId: req.id
           }),
         });
-        const { uploadUrl, fileKey } = await urlRes.json();
+        
+        const apiData = await urlRes.json();
+        
+        // 如果後端 API 就報錯 (例如金鑰沒設定)
+        if (!urlRes.ok) {
+          throw new Error(apiData.error || "無法取得上傳授權，可能是後端環境變數未設定。");
+        }
+
+        const { uploadUrl, fileKey } = apiData;
 
         // 2. 直接上傳到 R2
-        await fetch(uploadUrl, {
+        const uploadRes = await fetch(uploadUrl, {
           method: "PUT",
           headers: { "Content-Type": file.type },
           body: file,
         });
+
+        // 如果 R2 拒絕上傳 (通常是 CORS 沒開)
+        if (!uploadRes.ok) {
+          throw new Error(`Cloudflare 拒絕連線 (狀態碼: ${uploadRes.status})。請確認 R2 的 CORS 設定是否開啟。`);
+        }
 
         // 3. 寫入繳交紀錄到 Firestore
         const submissionData = {
@@ -112,14 +129,14 @@ export default function StudentUploadPage({
         );
 
         setUploadStatus(prev => ({ ...prev, [req.id]: "success" }));
-      } catch (error) {
-        console.error("上傳失敗:", error);
+      } catch (error: any) {
+        console.error("單一檔案上傳失敗:", error);
         setUploadStatus(prev => ({ ...prev, [req.id]: "error" }));
+        setErrorDetails(prev => ({ ...prev, [req.id]: error.message || "發生未知網路錯誤" }));
       }
     }
     
     setIsUploadingAll(false);
-    alert("上傳程序執行完畢！");
   };
 
   if (loading) {
@@ -215,7 +232,14 @@ export default function StudentUploadPage({
 
                     {uploadStatus[req.id] === "uploading" && <p className="text-xs text-blue-600 font-semibold animate-pulse mt-1">上傳中...</p>}
                     {uploadStatus[req.id] === "success" && <p className="text-xs text-emerald-600 font-semibold mt-1">✅ 繳交成功！</p>}
-                    {uploadStatus[req.id] === "error" && <p className="text-xs text-red-500 font-semibold mt-1">❌ 上傳失敗，請重試</p>}
+                    
+                    {/* 💡 這裡會把真實的失敗理由印出來 */}
+                    {uploadStatus[req.id] === "error" && (
+                      <div className="mt-2 text-xs text-red-600 bg-red-50/80 p-3 rounded-xl border border-red-100 break-words">
+                        <span className="font-bold block mb-1">❌ 上傳失敗原因：</span>
+                        {errorDetails[req.id] || "請檢查網路連線後重試"}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
