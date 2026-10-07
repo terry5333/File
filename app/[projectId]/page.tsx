@@ -21,12 +21,22 @@ export default function StudentUploadPage({
   const [filesData, setFilesData] = useState<{ [reqId: string]: File | null }>({});
   const [uploadStatus, setUploadStatus] = useState<{ [reqId: string]: string }>({});
   const [errorDetails, setErrorDetails] = useState<{ [reqId: string]: string }>({});
+  
   const [isUploadingAll, setIsUploadingAll] = useState(false);
+  const [isAllCompleted, setIsAllCompleted] = useState(false); 
 
   useEffect(() => {
     getDoc(doc(db, "projects", params.projectId)).then((snap) => {
       if (snap.exists()) {
-        setProject(snap.data());
+        const data = snap.data();
+        // 自動修復：如果舊專案的檔案需求沒有 id，就幫它補上，避免檔案互相覆蓋
+        if (data.fileRequirements) {
+          data.fileRequirements = data.fileRequirements.map((req: any, idx: number) => ({
+            ...req,
+            id: req.id || `req_legacy_${idx}`
+          }));
+        }
+        setProject(data);
       }
       setLoading(false);
     });
@@ -36,7 +46,6 @@ export default function StudentUploadPage({
     e.preventDefault();
     setErrorMsg("");
     
-    // 檢查時間範圍 (總開關的判斷我們直接做在畫面渲染層)
     const now = new Date();
     if (project?.startTime && now < new Date(project.startTime)) {
       setErrorMsg(`本專案尚未開放上傳。\n開放時間：${new Date(project.startTime).toLocaleString()}`);
@@ -73,16 +82,18 @@ export default function StudentUploadPage({
 
   const handleUploadAll = async () => {
     const requirements = project.fileRequirements || [];
-    const filesToUpload = requirements.filter((req: any) => filesData[req.id]);
-
-    if (filesToUpload.length === 0) {
-      alert("請至少選擇一個檔案上傳！");
+    
+    // 強制檢查：是否所有檔案都已經選擇了？
+    const missingFiles = requirements.filter((req: any) => !filesData[req.id]);
+    if (missingFiles.length > 0) {
+      alert(`您還有 ${missingFiles.length} 個檔案尚未選擇！請將所有檔案都選好後，再一併送出。`);
       return;
     }
 
     setIsUploadingAll(true);
+    let hasErrorOccurred = false;
 
-    for (const req of filesToUpload) {
+    for (const req of requirements) {
       const file = filesData[req.id];
       if (!file) continue;
 
@@ -131,9 +142,16 @@ export default function StudentUploadPage({
         console.error("單一檔案上傳失敗:", error);
         setUploadStatus(prev => ({ ...prev, [req.id]: "error" }));
         setErrorDetails(prev => ({ ...prev, [req.id]: error.message || "發生未知網路錯誤" }));
+        hasErrorOccurred = true;
       }
     }
+    
     setIsUploadingAll(false);
+    
+    // 如果全部成功沒有報錯，就切換到完成畫面
+    if (!hasErrorOccurred) {
+      setIsAllCompleted(true);
+    }
   };
 
   if (loading) {
@@ -151,7 +169,6 @@ export default function StudentUploadPage({
     );
   }
 
-  // 檢查總開關狀態 (預設沒設定就是開啟)
   const isUploadEnabled = project.isUploadEnabled !== false;
 
   return (
@@ -167,16 +184,13 @@ export default function StudentUploadPage({
             <h1 className="text-2xl font-bold text-slate-800 mt-2">{project.name}</h1>
           </div>
 
-          {/* 如果老師手動關閉總開關，直接顯示封鎖畫面 */}
           {!isUploadEnabled ? (
             <div className="p-8 bg-slate-100/80 border border-slate-200 rounded-2xl text-center shadow-sm">
               <div className="w-16 h-16 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
               </div>
               <p className="text-xl font-bold text-slate-800 mb-2">上傳功能已關閉</p>
-              <p className="text-sm text-slate-600">
-                老師目前已手動暫停此專案的檔案繳交功能。
-              </p>
+              <p className="text-sm text-slate-600">老師目前已手動暫停此專案的檔案繳交功能。</p>
             </div>
           ) : !matchedStudent ? (
             <form onSubmit={handleVerifyCode} className="space-y-6">
@@ -234,6 +248,20 @@ export default function StudentUploadPage({
                   不是我，重新輸入代號
                 </button>
               </div>
+            </div>
+          ) : isAllCompleted ? (
+            <div className="p-10 bg-white/70 border border-white/80 rounded-3xl text-center shadow-sm space-y-4">
+              <div className="w-24 h-24 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800">繳交完成！</h2>
+              <p className="text-slate-500 text-sm font-medium">您的所有檔案已成功送出，可以安心關閉此視窗了。</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-6 px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl transition-all text-sm"
+              >
+                返回首頁
+              </button>
             </div>
           ) : (
             <div className="space-y-6">
