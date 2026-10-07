@@ -1,33 +1,48 @@
-// app/api/upload/sign/route.ts
+// app/api/sign/route.ts
 import { NextResponse } from "next/server";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { r2 } from "@/lib/r2";
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { projectId, studentCode, fileRequirementId, fileName, contentType } = await req.json();
+    const { filename, contentType, projectId, studentCode, reqId } = await request.json();
 
-    if (!projectId || !studentCode || !fileName) {
-      return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
+    if (
+      !process.env.R2_ACCOUNT_ID ||
+      !process.env.R2_ACCESS_KEY_ID ||
+      !process.env.R2_SECRET_ACCESS_KEY ||
+      !process.env.R2_BUCKET_NAME
+    ) {
+      return NextResponse.json({ error: "R2 環境變數未設定完全" }, { status: 500 });
     }
 
-    // 格式化 R2 存儲路徑: [專案代號]/[學號]/[自訂要求ID]_[原始檔名]
-    // 例如: 302-midterm/30201/f1_企劃書.pdf
-    const key = `${projectId}/${studentCode}/${fileRequirementId}_${fileName}`;
+    const S3 = new S3Client({
+      region: "auto",
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+      },
+    });
+
+    // 檔案路徑設計：專案ID / 學生代號 / 檔案需求ID_原始檔名
+    const fileKey = `${projectId}/${studentCode}/${reqId}_${filename}`;
 
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: key,
-      ContentType: contentType || "application/octet-stream",
+      Key: fileKey,
+      ContentType: contentType,
     });
 
-    // 產生一個 10 分鐘 (600 秒) 後失效的上傳網址
-    const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 600 });
+    // 產生一個 5 分鐘內有效的上傳網址
+    const signedUrl = await getSignedUrl(S3, command, { expiresIn: 300 });
 
-    return NextResponse.json({ uploadUrl, key });
-  } catch (err: any) {
-    console.error("Sign URL Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({
+      uploadUrl: signedUrl,
+      fileKey: fileKey,
+    });
+  } catch (error: any) {
+    console.error("產生上傳網址錯誤:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
