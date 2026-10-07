@@ -24,7 +24,7 @@ export default function ProjectLayout({
   }, [params.projectId]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const studentUrl = `${origin}/p/${params.projectId}`;
+  const studentUrl = `${origin}/${params.projectId}`;
   const teacherUrl = `${origin}/teacher/${params.projectId}?token=${project?.teacherToken}`;
 
   const copyToClipboard = (url: string, type: string) => {
@@ -34,16 +34,13 @@ export default function ProjectLayout({
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-slate-50 p-4 md:p-10">
-      {/* 延續玻璃光暈背景 */}
       <div className="fixed top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-blue-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none"></div>
       <div className="fixed bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none"></div>
 
       <div className="relative z-10 max-w-6xl mx-auto">
-        {/* 頂部導航卡片 */}
         <header className="bg-white/40 backdrop-blur-2xl border border-white/60 p-6 md:p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
             <div className="flex items-center gap-4">
-              {/* 「切換專案」按鈕：隨時跳回專案列表 */}
               <Link 
                 href="/admin" 
                 className="px-4 py-2.5 bg-white/60 hover:bg-white backdrop-blur-md rounded-xl flex items-center gap-2 text-slate-700 font-medium text-sm shadow-sm transition-all border border-white/80"
@@ -84,7 +81,6 @@ export default function ProjectLayout({
             </div>
           </div>
 
-          {/* 分頁切換 */}
           <nav className="flex space-x-2 border-b border-white/40 pb-1">
             <Link
               href={`/admin/${params.projectId}`}
