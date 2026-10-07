@@ -10,7 +10,6 @@ export default function StudentsManagePage({
 }: {
   params: { projectId: string };
 }) {
-  const [studentsText, setStudentsText] = useState("");
   const [studentsList, setStudentsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -22,39 +21,46 @@ export default function StudentsManagePage({
         const data = snap.data();
         if (data.students) {
           setStudentsList(data.students);
-          // 格式：代號 座號 姓名
-          const text = data.students.map((s: any) => `${s.code}\t${s.seat}\t${s.name}`).join("\n");
-          setStudentsText(text);
         }
       }
       setLoading(false);
     });
   }, [params.projectId]);
 
+  // 新增一個空白的學生格子
+  const handleAddStudent = () => {
+    setStudentsList([...studentsList, { code: "", seat: "", name: "" }]);
+  };
+
+  // 更新特定格子的欄位
+  const handleStudentChange = (index: number, field: string, value: string) => {
+    const updated = [...studentsList];
+    updated[index] = { ...updated[index], [field]: value };
+    setStudentsList(updated);
+  };
+
+  // 刪除特定格子
+  const handleRemoveStudent = (index: number) => {
+    const updated = studentsList.filter((_, i) => i !== index);
+    setStudentsList(updated);
+  };
+
+  // 儲存所有學生名單到 Firestore
   const handleSave = async () => {
     setSaving(true);
     try {
-      const lines = studentsText.split("\n");
-      const parsed = lines
-        .map((line) => {
-          const parts = line.trim().split(/\s+/);
-          if (parts.length >= 3) {
-            return { code: parts[0], seat: parts[1], name: parts.slice(2).join(" ") };
-          } else if (parts.length === 2) {
-            // 如果只有兩欄，自動把座號當代號
-            return { code: parts[0], seat: parts[0], name: parts.slice(1).join(" ") };
-          }
-          return null;
-        })
-        .filter(Boolean);
+      // 過濾掉完全空白的行
+      const validStudents = studentsList.filter(
+        (s) => s.code.trim() !== "" || s.name.trim() !== ""
+      );
 
       await setDoc(
         doc(db, "projects", params.projectId),
-        { students: parsed },
+        { students: validStudents },
         { merge: true }
       );
 
-      setStudentsList(parsed);
+      setStudentsList(validStudents);
       alert("學生名單儲存成功！");
     } catch (error: any) {
       console.error("儲存失敗:", error);
@@ -65,64 +71,109 @@ export default function StudentsManagePage({
   };
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <div className="bg-white/40 backdrop-blur-2xl border border-white/60 p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)]">
-        <h2 className="text-xl font-bold text-slate-800 mb-2">編輯學生名單 (支援代號)</h2>
-        <p className="text-sm text-slate-500 mb-6">
-          每行一位：<span className="font-semibold text-slate-700">代號 座號 姓名</span>（例如：<code className="bg-white/60 px-1.5 py-0.5 rounded">a01 01 王小明</code>）
-        </p>
-
-        <div className="space-y-4">
-          <textarea
-            rows={12}
-            value={studentsText}
-            onChange={(e) => setStudentsText(e.target.value)}
-            placeholder={"例：\na01\t01\t王小明\na02\t02\t李小華"}
-            className="w-full p-4 bg-white/60 border border-white/80 rounded-2xl text-slate-700 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all shadow-sm"
-          />
-
+    <div className="bg-white/40 backdrop-blur-2xl border border-white/60 p-6 md:p-10 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] max-w-4xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">學生名單管理</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            以表格格子形式逐一新增學生的代號、座號與姓名。
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleAddStudent}
+            className="px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium text-sm rounded-xl border border-blue-200 transition-all"
+          >
+            + 新增學生格子
+          </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full py-3.5 bg-blue-600/90 hover:bg-blue-600 backdrop-blur-md text-white font-semibold rounded-xl shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50"
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50"
           >
-            {saving ? "儲存中..." : "儲存名單"}
+            {saving ? "儲存中..." : "儲存全部名單"}
           </button>
         </div>
       </div>
 
-      <div className="bg-white/40 backdrop-blur-2xl border border-white/60 p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)]">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-slate-800">目前名單預覽</h2>
-          <span className="px-3 py-1 bg-blue-50 text-blue-700 font-semibold text-xs rounded-lg border border-blue-100">
-            共 {studentsList.length} 位學生
-          </span>
+      {loading ? (
+        <div className="text-center py-16 text-slate-400">載入中...</div>
+      ) : studentsList.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-48 text-slate-400 bg-white/30 rounded-2xl border border-white/50 border-dashed mb-6">
+          <p className="mb-2">目前沒有學生資料</p>
+          <button
+            onClick={handleAddStudent}
+            className="text-sm text-blue-600 font-semibold underline"
+          >
+            點此新增第一位學生
+          </button>
         </div>
+      ) : (
+        <div className="space-y-3 mb-8">
+          <div className="hidden md:grid grid-cols-12 gap-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <div className="col-span-3">登入代號</div>
+            <div className="col-span-2">座號</div>
+            <div className="col-span-6">學生姓名</div>
+            <div className="col-span-1 text-center">操作</div>
+          </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-slate-400">載入中...</div>
-        ) : studentsList.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400 bg-white/30 rounded-2xl border border-white/50 border-dashed">
-            <p>尚未建立學生名單</p>
-          </div>
-        ) : (
-          <div className="max-h-[380px] overflow-y-auto space-y-2 pr-2">
-            {studentsList.map((s, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-white/50 border border-white/70 rounded-xl shadow-sm">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                    代號: {s.code}
-                  </span>
-                  <span className="font-mono text-xs text-slate-500">
-                    座號: {s.seat}
-                  </span>
-                </div>
-                <span className="font-bold text-slate-800 text-sm">{s.name}</span>
+          {studentsList.map((student, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 bg-white/60 border border-white/80 rounded-2xl shadow-sm items-center"
+            >
+              <div className="col-span-3">
+                <input
+                  type="text"
+                  value={student.code || ""}
+                  onChange={(e) => handleStudentChange(index, "code", e.target.value)}
+                  placeholder="代號 (例: a01)"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-blue-400"
+                />
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div className="col-span-2">
+                <input
+                  type="text"
+                  value={student.seat || ""}
+                  onChange={(e) => handleStudentChange(index, "seat", e.target.value)}
+                  placeholder="座號 (例: 01)"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+              <div className="col-span-6">
+                <input
+                  type="text"
+                  value={student.name || ""}
+                  onChange={(e) => handleStudentChange(index, "name", e.target.value)}
+                  placeholder="學生姓名 (例: 王小明)"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+              <div className="col-span-1 flex justify-center">
+                <button
+                  onClick={() => handleRemoveStudent(index)}
+                  className="w-9 h-9 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors"
+                  title="刪除此行"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {studentsList.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50"
+          >
+            {saving ? "儲存中..." : "儲存全部名單"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
