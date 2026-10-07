@@ -15,7 +15,6 @@ export default function StudentsManagePage({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // 讀取現有學生名單
   useEffect(() => {
     setLoading(true);
     getDoc(doc(db, "projects", params.projectId)).then((snap) => {
@@ -23,8 +22,8 @@ export default function StudentsManagePage({
         const data = snap.data();
         if (data.students) {
           setStudentsList(data.students);
-          // 將名單轉回文字格式方便編輯
-          const text = data.students.map((s: any) => `${s.seat}\t${s.name}`).join("\n");
+          // 格式：代號 座號 姓名
+          const text = data.students.map((s: any) => `${s.code}\t${s.seat}\t${s.name}`).join("\n");
           setStudentsText(text);
         }
       }
@@ -32,23 +31,23 @@ export default function StudentsManagePage({
     });
   }, [params.projectId]);
 
-  // 儲存名單
   const handleSave = async () => {
     setSaving(true);
     try {
-      // 解析文字：每行格式為「座號 姓名」(可用空白或 Tab 分隔)
       const lines = studentsText.split("\n");
       const parsed = lines
         .map((line) => {
           const parts = line.trim().split(/\s+/);
-          if (parts.length >= 2) {
-            return { seat: parts[0], name: parts.slice(1).join(" ") };
+          if (parts.length >= 3) {
+            return { code: parts[0], seat: parts[1], name: parts.slice(2).join(" ") };
+          } else if (parts.length === 2) {
+            // 如果只有兩欄，自動把座號當代號
+            return { code: parts[0], seat: parts[0], name: parts.slice(1).join(" ") };
           }
           return null;
         })
         .filter(Boolean);
 
-      // 寫入 Firestore 的專案文件內
       await setDoc(
         doc(db, "projects", params.projectId),
         { students: parsed },
@@ -67,11 +66,10 @@ export default function StudentsManagePage({
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      {/* 左側：編輯區 */}
       <div className="bg-white/40 backdrop-blur-2xl border border-white/60 p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)]">
-        <h2 className="text-xl font-bold text-slate-800 mb-2">編輯學生名單</h2>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">編輯學生名單 (支援代號)</h2>
         <p className="text-sm text-slate-500 mb-6">
-          請直接貼上或輸入座號與姓名（每行一位，座號與姓名之間用空白或 Tab 隔開）。
+          每行一位：<span className="font-semibold text-slate-700">代號 座號 姓名</span>（例如：<code className="bg-white/60 px-1.5 py-0.5 rounded">a01 01 王小明</code>）
         </p>
 
         <div className="space-y-4">
@@ -79,7 +77,7 @@ export default function StudentsManagePage({
             rows={12}
             value={studentsText}
             onChange={(e) => setStudentsText(e.target.value)}
-            placeholder={"例：\n01 王小明\n02 李小華\n03 張大為"}
+            placeholder={"例：\na01\t01\t王小明\na02\t02\t李小華"}
             className="w-full p-4 bg-white/60 border border-white/80 rounded-2xl text-slate-700 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all shadow-sm"
           />
 
@@ -93,7 +91,6 @@ export default function StudentsManagePage({
         </div>
       </div>
 
-      {/* 右側：預覽區 */}
       <div className="bg-white/40 backdrop-blur-2xl border border-white/60 p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)]">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-slate-800">目前名單預覽</h2>
@@ -112,10 +109,15 @@ export default function StudentsManagePage({
           <div className="max-h-[380px] overflow-y-auto space-y-2 pr-2">
             {studentsList.map((s, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-white/50 border border-white/70 rounded-xl shadow-sm">
-                <span className="font-mono text-xs font-bold bg-slate-200/60 text-slate-600 px-2.5 py-1 rounded-md">
-                  {s.seat}
-                </span>
-                <span className="font-medium text-slate-700 text-sm">{s.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                    代號: {s.code}
+                  </span>
+                  <span className="font-mono text-xs text-slate-500">
+                    座號: {s.seat}
+                  </span>
+                </div>
+                <span className="font-bold text-slate-800 text-sm">{s.name}</span>
               </div>
             ))}
           </div>
