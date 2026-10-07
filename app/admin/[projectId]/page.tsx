@@ -23,9 +23,16 @@ export default function ProjectDashboardPage({
       try {
         const snap = await getDoc(doc(db, "projects", params.projectId));
         if (snap.exists()) {
-          setProject(snap.data());
+          const data = snap.data();
+          // 自動修復舊專案缺少 id 的問題
+          if (data.fileRequirements) {
+            data.fileRequirements = data.fileRequirements.map((req: any, idx: number) => ({
+              ...req,
+              id: req.id || `req_legacy_${idx}`
+            }));
+          }
+          setProject(data);
           
-          // 抓取繳交紀錄
           const subSnap = await getDocs(collection(db, "projects", params.projectId, "submissions"));
           const subs = subSnap.docs.map(d => d.data());
           setSubmissions(subs);
@@ -40,7 +47,6 @@ export default function ProjectDashboardPage({
     fetchProjectData();
   }, [params.projectId]);
 
-  // 切換強制上傳開關
   const handleToggleUpload = async () => {
     setToggling(true);
     const currentStatus = project.isUploadEnabled !== false;
@@ -59,7 +65,6 @@ export default function ProjectDashboardPage({
     }
   };
 
-  // 預覽單一檔案
   const handlePreview = async (fileKey: string) => {
     try {
       const res = await fetch("/api/sign/read", {
@@ -69,7 +74,7 @@ export default function ProjectDashboardPage({
       });
       const data = await res.json();
       if (data.url) {
-        window.open(data.url, "_blank"); // 另開分頁預覽
+        window.open(data.url, "_blank");
       } else {
         throw new Error("無法取得網址");
       }
@@ -79,7 +84,6 @@ export default function ProjectDashboardPage({
     }
   };
 
-  // 打包下載所有檔案
   const handleDownloadAll = async () => {
     if (submissions.length === 0) {
       return alert("目前還沒有任何人繳交作業！");
@@ -89,9 +93,7 @@ export default function ProjectDashboardPage({
     try {
       const zip = new JSZip();
       
-      // 依序處理每個已繳交的檔案
       for (const sub of submissions) {
-        // 1. 取得該檔案的真實 R2 網址
         const res = await fetch("/api/sign/read", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -99,16 +101,13 @@ export default function ProjectDashboardPage({
         });
         const { url } = await res.json();
 
-        // 2. 下載檔案內容到瀏覽器記憶體
         const fileRes = await fetch(url);
         const blob = await fileRes.blob();
 
-        // 3. 把檔案塞進 ZIP 裡，並依照「座號_姓名」建立資料夾分類
         const folderName = `${sub.studentSeat}_${sub.studentName}`;
         zip.file(`${folderName}/${sub.filename}`, blob);
       }
 
-      // 4. 產生壓縮檔並觸發下載
       const content = await zip.generateAsync({ type: "blob" });
       saveAs(content, `${project.name}_全班作業.zip`);
       
@@ -143,7 +142,6 @@ export default function ProjectDashboardPage({
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          {/* 一鍵打包下載按鈕 */}
           <button
             onClick={handleDownloadAll}
             disabled={downloadingAll || submissions.length === 0}
