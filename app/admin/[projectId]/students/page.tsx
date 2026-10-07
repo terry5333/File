@@ -68,7 +68,6 @@ export default function StudentsManagePage({
     if (!selectedSourceId) return alert("請先選擇要匯入的來源專案！");
     const sourceProj = allProjects.find((p) => p.id === selectedSourceId);
     if (sourceProj && sourceProj.students) {
-      // 複製一份避免互相影響
       setStudentsList(JSON.parse(JSON.stringify(sourceProj.students)));
       alert(`已成功從「${sourceProj.name}」帶入名單！記得點擊下方的「儲存全部名單」才會正式生效。`);
     }
@@ -106,7 +105,7 @@ export default function StudentsManagePage({
         <div>
           <h2 className="text-xl font-bold text-slate-800">學生名單管理</h2>
           <p className="text-sm text-slate-500 mt-1">
-            以格子形式逐一新增，或從其他專案直接抓取名單。
+            直接透過格子逐一新增、修改學生，或從其他專案抓取。
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -197,7 +196,7 @@ export default function StudentsManagePage({
                 </div>
               </div>
 
-              {/* 下半部：姓名與刪除按鈕（左右各半 / 搭配刪除） */}
+              {/* 下半部：姓名與刪除按鈕（左右各半） */}
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <label className="block text-xs font-semibold text-slate-500 mb-1">學生姓名</label>
