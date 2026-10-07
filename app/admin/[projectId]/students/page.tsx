@@ -1,0 +1,1 @@
+app/admin/[projectId]/students/page.tsx
