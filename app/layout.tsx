@@ -1,4 +1,5 @@
-import "./globals.css";
+// app/layout.tsx
+import "./globals.css"; // 確保這行存在，這是載入 Tailwind 的關鍵
 
 export const metadata = {
   title: "302 檔案上傳系統",
@@ -12,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-TW">
-      <body className="bg-gray-50 text-gray-900 antialiased">
+      <body className="bg-slate-50 text-slate-900 antialiased">
         {children}
       </body>
     </html>
