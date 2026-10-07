@@ -1,165 +1,129 @@
+// app/admin/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { signOut, onAuthStateChanged } from "firebase/auth";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { doc, setDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
 
-export default function CreateProjectPage() {
+export default function AdminDashboard() {
+  const [user, setUser] = useState<any>(null);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sysError, setSysError] = useState("");
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [files, setFiles] = useState([{ id: "file_1", title: "", ext: ".pdf" }]);
 
-  const addFileRequirement = () => {
-    setFiles([...files, { id: `file_${Date.now()}`, title: "", ext: ".pdf" }]);
-  };
+  useEffect(() => {
+    try {
+      if (!auth || !auth.onAuthStateChanged) return;
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        if (currentUser) {
+          fetchProjects();
+        } else {
+          setLoading(false);
+        }
+      });
+      return () => unsubscribe();
+    } catch (error: any) {
+      setSysError(error.message);
+    }
+  }, []);
 
-  const updateFile = (index: number, field: string, value: string) => {
-    const newFiles = [...files];
-    newFiles[index] = { ...newFiles[index], [field]: value };
-    setFiles(newFiles);
-  };
-
-  const removeFile = (index: number) => {
-    const newFiles = files.filter((_, i) => i !== index);
-    setFiles(newFiles);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !slug) return alert("請填寫專案名稱與代碼！");
-    
-    const validFiles = files.filter(f => f.title.trim() !== "");
-    if (validFiles.length === 0) return alert("請至少設定一個需要收取的檔案！");
-
+  const fetchProjects = async () => {
     setLoading(true);
     try {
-      const user = auth?.currentUser;
-      const teacherToken = Math.random().toString(36).substring(2, 10);
-
-      const projectData = {
-        name,
-        slug,
-        fileRequirements: validFiles,
-        teacherToken,
-        adminEmail: user?.email || "unknown",
-        createdAt: Date.now(),
-      };
-
-      await setDoc(doc(db, "projects", slug), projectData);
-      router.push(`/admin/${slug}`);
+      const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const projData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setProjects(projData);
     } catch (error: any) {
-      console.error("建立失敗:", error);
-      alert("建立失敗，請確認是否已登入且具有寫入權限。");
+      setSysError("讀取專案失敗: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    setProjects([]);
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen relative overflow-hidden bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-sm p-10 bg-white/40 backdrop-blur-2xl border border-white/60 rounded-[2rem] shadow-[0_8px_40px_0_rgba(31,38,135,0.07)] text-center">
+          <h1 className="text-2xl font-bold mb-2 text-slate-800">請先登入</h1>
+          <p className="text-sm text-slate-500 mb-6">管理員後台驗證</p>
+          <Link href="/admin" className="block w-full py-3 bg-blue-600 text-white font-semibold rounded-xl shadow-md">
+            前往登入
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen relative overflow-hidden bg-slate-50 p-4 md:p-10 flex justify-center items-start">
-      {/* 懸浮背景光暈 */}
+    <div className="min-h-screen relative overflow-hidden bg-slate-50 p-4 md:p-10">
       <div className="fixed top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-blue-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none"></div>
-      <div className="fixed bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none"></div>
+      <div className="fixed bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-purple-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none"></div>
 
-      <div className="relative z-10 w-full max-w-2xl mt-10">
-        <form onSubmit={handleSubmit} className="bg-white/40 backdrop-blur-2xl border border-white/60 p-8 md:p-10 rounded-[2rem] shadow-[0_8px_40px_0_rgba(31,38,135,0.05)]">
-          <div className="flex items-center gap-4 mb-8">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="w-10 h-10 bg-white/60 hover:bg-white backdrop-blur-md rounded-xl flex items-center justify-center text-slate-500 shadow-sm transition-all"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-            </button>
-            <h1 className="text-2xl font-bold text-slate-800">建立新專案</h1>
-          </div>
-
-          <div className="space-y-6">
-            <div className="p-6 bg-white/30 rounded-2xl border border-white/50 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">專案名稱</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="例：網頁設計期末專題"
-                  className="w-full px-4 py-3 bg-white/60 border border-white/80 rounded-xl text-slate-700 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-400 outline-none transition-all shadow-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">專案代碼 (作為網址 ID，限英數)</label>
-                <input
-                  type="text"
-                  required
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value.replace(/[^a-zA-Z0-9-]/g, ''))}
-                  placeholder="例：302-final"
-                  className="w-full px-4 py-3 bg-white/60 border border-white/80 rounded-xl text-slate-700 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-400 outline-none transition-all shadow-sm font-mono"
-                />
-              </div>
+      <div className="relative z-10 max-w-5xl mx-auto">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-5 bg-white/40 backdrop-blur-2xl border border-white/60 p-6 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)]">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white/80 rounded-2xl shadow-sm border border-white flex items-center justify-center">
+              <svg className="w-7 h-7 text-blue-600/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
             </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800 tracking-tight">專案總覽</h1>
+              <p className="text-sm text-slate-500 font-medium truncate">{user.email}</p>
+            </div>
+          </div>
+          <div className="flex gap-3 w-full md:w-auto">
+            <button onClick={() => router.push("/admin/create")} className="flex-1 md:flex-none px-6 py-3 bg-blue-600/90 hover:bg-blue-600 backdrop-blur-md text-white font-medium text-sm rounded-xl shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5">
+              + 新增專案
+            </button>
+            <button onClick={handleLogout} className="px-6 py-3 bg-white/60 hover:bg-white backdrop-blur-md text-slate-700 font-medium border border-white/80 text-sm rounded-xl shadow-sm transition-all">
+              登出
+            </button>
+          </div>
+        </header>
 
-            <div className="p-6 bg-white/30 rounded-2xl border border-white/50">
-              <div className="flex justify-between items-center mb-4">
-                <label className="block text-sm font-semibold text-slate-700">檔案收取清單</label>
-                <button
-                  type="button"
-                  onClick={addFileRequirement}
-                  className="text-sm px-3 py-1.5 bg-blue-50 text-blue-600 font-medium rounded-lg hover:bg-blue-100 transition-colors"
-                >
-                  + 新增檔案
-                </button>
-              </div>
-              
-              <div className="space-y-3">
-                {files.map((file, index) => (
-                  <div key={file.id} className="flex gap-2 items-center bg-white/40 p-2 rounded-xl border border-white/60">
-                    <input
-                      type="text"
-                      required
-                      value={file.title}
-                      onChange={(e) => updateFile(index, "title", e.target.value)}
-                      placeholder="檔案名稱 (例：企劃書 PDF)"
-                      className="flex-1 px-3 py-2 bg-white/60 border border-white/80 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                    <select
-                      value={file.ext}
-                      onChange={(e) => updateFile(index, "ext", e.target.value)}
-                      className="w-24 px-2 py-2 bg-white/60 border border-white/80 rounded-lg text-sm outline-none font-medium text-slate-600"
-                    >
-                      <option value="*">不限</option>
-                      <option value=".pdf">PDF</option>
-                      <option value=".docx">DOCX</option>
-                      <option value=".pptx">PPTX</option>
-                      <option value="image/*">圖片</option>
-                    </select>
-                    {files.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="w-8 h-8 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
-                      >
-                        ✕
-                      </button>
-                    )}
+        {sysError && (
+          <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl border border-red-200">
+            {sysError}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="text-center py-20 text-slate-500 font-medium animate-pulse">正在載入專案資料...</div>
+        ) : projects.length === 0 ? (
+          <div className="bg-white/40 backdrop-blur-xl border border-white/60 p-16 rounded-[2rem] text-center shadow-sm">
+            <p className="text-slate-500 font-medium mb-1">目前還沒有任何專案</p>
+            <p className="text-sm text-slate-400">點擊右上角按鈕開始建立第一個專案</p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {projects.map((project) => (
+              <div key={project.id} className="group bg-white/40 backdrop-blur-xl p-6 rounded-[2rem] border border-white/60 shadow-[0_8px_32px_0_rgba(31,38,135,0.04)] hover:bg-white/60 hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <h2 className="text-lg font-bold text-slate-800 line-clamp-1">{project.name}</h2>
                   </div>
-                ))}
+                  <div className="space-y-2 mb-6">
+                    <p className="text-xs font-medium text-slate-500 bg-white/50 inline-block px-2.5 py-1 rounded-lg border border-white/60">ID: {project.id}</p>
+                    <p className="text-sm text-slate-500">需收取 <span className="font-semibold text-slate-700">{project.fileRequirements?.length || 0}</span> 個檔案</p>
+                  </div>
+                </div>
+                <Link href={`/admin/${project.id}`} className="block text-center w-full py-2.5 bg-white/50 border border-white/80 text-blue-600 font-medium text-sm rounded-xl group-hover:bg-blue-50/50 transition-all">
+                  進入管理
+                </Link>
               </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 bg-blue-600/90 hover:bg-blue-600 backdrop-blur-md text-white font-semibold rounded-xl shadow-[0_8px_20px_0_rgba(37,99,235,0.2)] hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
-            >
-              {loading ? "建立中..." : "確認建立專案"}
-            </button>
+            ))}
           </div>
-        </form>
+        )}
       </div>
     </div>
   );
