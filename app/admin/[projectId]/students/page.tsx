@@ -23,7 +23,6 @@ export default function StudentsManagePage({
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. 讀取目前專案的學生名單
       const currentSnap = await getDoc(doc(db, "projects", params.projectId));
       if (currentSnap.exists()) {
         const data = currentSnap.data();
@@ -32,7 +31,6 @@ export default function StudentsManagePage({
         }
       }
 
-      // 2. 讀取所有專案（用來做「從其他專案抓取」的下拉選單）
       const querySnapshot = await getDocs(collection(db, "projects"));
       const projects = querySnapshot.docs
         .map((d) => ({ id: d.id, ...d.data() } as any))
@@ -45,25 +43,21 @@ export default function StudentsManagePage({
     }
   };
 
-  // 新增一個空白格子
   const handleAddStudent = () => {
     setStudentsList([...studentsList, { code: "", seat: "", name: "" }]);
   };
 
-  // 更新格子內容
   const handleStudentChange = (index: number, field: string, value: string) => {
     const updated = [...studentsList];
     updated[index] = { ...updated[index], [field]: value };
     setStudentsList(updated);
   };
 
-  // 刪除單個格子
   const handleRemoveStudent = (index: number) => {
     const updated = studentsList.filter((_, i) => i !== index);
     setStudentsList(updated);
   };
 
-  // 從其他專案匯入名單
   const handleImportFromProject = () => {
     if (!selectedSourceId) return alert("請先選擇要匯入的來源專案！");
     const sourceProj = allProjects.find((p) => p.id === selectedSourceId);
@@ -73,7 +67,6 @@ export default function StudentsManagePage({
     }
   };
 
-  // 儲存全部名單
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -100,12 +93,11 @@ export default function StudentsManagePage({
   return (
     <div className="bg-white/40 backdrop-blur-2xl border border-white/60 p-6 md:p-10 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] max-w-4xl mx-auto">
       
-      {/* 頂部控制列 */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">學生名單管理</h2>
+          <h2 className="text-xl font-bold text-slate-800">學生名單管理 (純格子版)</h2>
           <p className="text-sm text-slate-500 mt-1">
-            直接透過格子逐一新增、修改學生，或從其他專案抓取。
+            透過獨立格子逐一管理學生資料，已完全移除舊文字框。
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -125,7 +117,6 @@ export default function StudentsManagePage({
         </div>
       </div>
 
-      {/* 從其他專案抓取名單區塊 */}
       {allProjects.length > 0 && (
         <div className="mb-8 p-4 bg-white/60 border border-white/80 rounded-2xl flex flex-col md:flex-row items-center gap-3">
           <div className="text-sm font-semibold text-slate-700 whitespace-nowrap">
@@ -152,7 +143,6 @@ export default function StudentsManagePage({
         </div>
       )}
 
-      {/* 學生格子列表 */}
       {loading ? (
         <div className="text-center py-16 text-slate-400">載入中...</div>
       ) : studentsList.length === 0 ? (
@@ -172,7 +162,6 @@ export default function StudentsManagePage({
               key={index}
               className="p-4 bg-white/60 border border-white/80 rounded-2xl shadow-sm space-y-3"
             >
-              {/* 上半部：代號與座號（左右各半） */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">登入代號</label>
@@ -196,7 +185,6 @@ export default function StudentsManagePage({
                 </div>
               </div>
 
-              {/* 下半部：姓名與刪除按鈕（左右各半） */}
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <label className="block text-xs font-semibold text-slate-500 mb-1">學生姓名</label>
