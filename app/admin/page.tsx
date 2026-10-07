@@ -12,46 +12,52 @@ export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sysError, setSysError] = useState(""); // 顯示錯誤用
   const router = useRouter();
 
-  // 監聽登入狀態
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        fetchProjects();
-      } else {
-        setLoading(false);
+    try {
+      // 安全檢查：確認 Firebase 有成功載入
+      if (!auth || !auth.onAuthStateChanged) {
+        setSysError("系統抓不到 Firebase 環境變數，請確認 Vercel 是否有 Redeploy。");
+        return;
       }
-    });
-    return () => unsubscribe();
+
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        if (currentUser) {
+          fetchProjects();
+        } else {
+          setLoading(false);
+        }
+      });
+      return () => unsubscribe();
+    } catch (error: any) {
+      setSysError(error.message);
+    }
   }, []);
 
-  // 讀取專案列表
   const fetchProjects = async () => {
     setLoading(true);
     try {
+      if (!db) throw new Error("Firestore 未初始化");
       const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
-      const projData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const projData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setProjects(projData);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      alert("讀取專案失敗，請確認你的 Firebase 安全規則是否允許讀取。");
+    } catch (error: any) {
+      setSysError("讀取專案失敗: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
     try {
+      const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login failed:", error);
+    } catch (error: any) {
+      setSysError("登入失敗: " + error.message);
     }
   };
 
@@ -60,11 +66,20 @@ export default function AdminDashboard() {
     setProjects([]);
   };
 
-  // 尚未登入的畫面
+  // 如果有錯誤，直接顯示在螢幕上！
+  if (sysError) {
+    return (
+      <div className="p-8 m-4 bg-red-50 border border-red-200 rounded text-red-600 break-words">
+        <h2 className="font-bold text-lg mb-2">系統發生錯誤</h2>
+        <p>{sysError}</p>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <div className="p-8 bg-white rounded-xl shadow-lg border text-center max-w-sm w-full">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+        <div className="p-8 bg-white rounded-xl shadow-lg border text-center w-full max-w-sm">
           <h1 className="text-2xl font-bold mb-2">管理員登入</h1>
           <p className="text-sm text-gray-500 mb-6">302 檔案上傳管理系統</p>
           <button
@@ -78,26 +93,19 @@ export default function AdminDashboard() {
     );
   }
 
-  // 登入後的畫面 (專案列表)
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-12">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-12">
       <div className="max-w-4xl mx-auto">
-        <header className="flex justify-between items-center mb-8">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">專案管理看板</h1>
-            <p className="text-sm text-gray-500">登入者: {user.email}</p>
+            <p className="text-sm text-gray-500 truncate">登入者: {user.email}</p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={() => router.push("/admin/create")}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition shadow-sm"
-            >
+            <button onClick={() => router.push("/admin/create")} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
               + 新增專案
             </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-white text-gray-700 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 transition"
-            >
+            <button onClick={handleLogout} className="px-4 py-2 bg-white text-gray-700 border text-sm rounded-lg">
               登出
             </button>
           </div>
@@ -106,33 +114,16 @@ export default function AdminDashboard() {
         {loading ? (
           <div className="text-center py-12 text-gray-500">載入中...</div>
         ) : projects.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
+          <div className="bg-white rounded-xl border p-12 text-center">
             <p className="text-gray-500 mb-4">目前還沒有任何專案</p>
-            <button
-              onClick={() => router.push("/admin/create")}
-              className="text-blue-600 font-medium hover:underline"
-            >
-              立即建立第一個專案
-            </button>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {projects.map((project) => (
-              <div key={project.id} className="bg-white p-6 rounded-xl border shadow-sm hover:shadow-md transition">
-                <div className="flex justify-between items-start mb-4">
-                  <h2 className="text-lg font-bold text-gray-800">{project.name}</h2>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                    ID: {project.id}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-600 mb-4">
-                  <p>需收檔案數：{project.fileRequirements?.length || 0} 個</p>
-                  <p>建立日期：{new Date(project.createdAt).toLocaleDateString()}</p>
-                </div>
-                <Link
-                  href={`/admin/${project.id}`}
-                  className="block text-center w-full py-2 bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded hover:bg-gray-100 transition"
-                >
+              <div key={project.id} className="bg-white p-6 rounded-xl border shadow-sm">
+                <h2 className="text-lg font-bold">{project.name}</h2>
+                <p className="text-sm text-gray-500 mb-4 mt-1">ID: {project.id}</p>
+                <Link href={`/admin/${project.id}`} className="block text-center w-full py-2 bg-gray-50 border text-gray-700 text-sm rounded">
                   進入專案管理
                 </Link>
               </div>
