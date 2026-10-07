@@ -12,9 +12,12 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// 確保 Firebase 只會初始化一次（避免 Next.js 熱重載時報錯）
+// 初始化 Firebase 應用程式
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-const auth = getAuth(app);
+
+// 關鍵修復：只在瀏覽器環境 (Client-side) 才啟動 Auth 與 Firestore
+// 這樣就能完美避開 Vercel 在 Server-side 預先打包時的報錯
+const db = typeof window !== "undefined" ? getFirestore(app) : ({} as any);
+const auth = typeof window !== "undefined" ? getAuth(app) : ({} as any);
 
 export { app, db, auth };
