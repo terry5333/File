@@ -1,179 +1,115 @@
+// app/admin/create/page.tsx
 "use client";
 
 import { useState } from "react";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { doc, setDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import Link from "next/link";
 
 export default function CreateProjectPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  
-  // 表單狀態
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState(""); // 專案 ID
-  const [files, setFiles] = useState([{ id: "file_1", title: "", ext: ".pdf" }]);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [allowResubmit, setAllowResubmit] = useState(true); // 新增：是否允許重複繳交
+  const [requirements, setRequirements] = useState([{ id: "req_1", title: "", ext: "*" }]);
+  const [saving, setSaving] = useState(false);
+  const router = useRouter();
 
-  // 新增一個檔案需求欄位
-  const addFileRequirement = () => {
-    setFiles([...files, { id: `file_${Date.now()}`, title: "", ext: ".pdf" }]);
+  const handleAddRequirement = () => {
+    setRequirements([...requirements, { id: `req_${Date.now()}`, title: "", ext: "*" }]);
   };
 
-  // 更新檔案需求內容
-  const updateFile = (index: number, field: string, value: string) => {
-    const newFiles = [...files];
-    newFiles[index] = { ...newFiles[index], [field]: value };
-    setFiles(newFiles);
+  const handleRequirementChange = (index: number, field: string, value: string) => {
+    const updated = [...requirements];
+    updated[index] = { ...updated[index], [field]: value };
+    setRequirements(updated);
   };
 
-  // 移除檔案需求
-  const removeFile = (index: number) => {
-    const newFiles = files.filter((_, i) => i !== index);
-    setFiles(newFiles);
+  const handleRemoveRequirement = (index: number) => {
+    setRequirements(requirements.filter((_, i) => i !== index));
   };
 
-  // 送出建立專案
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !slug) return alert("請填寫專案名稱與專案 ID！");
-    
-    // 過濾掉沒寫標題的檔案需求
-    const validFiles = files.filter(f => f.title.trim() !== "");
-    if (validFiles.length === 0) return alert("請至少設定一個需要收取的檔案！");
+  const handleSave = async () => {
+    if (!name.trim() || !startTime || !endTime) return alert("請填寫完整專案資訊");
+    const validReqs = requirements.filter(r => r.title.trim() !== "");
+    if (validReqs.length === 0) return alert("請至少設定一個檔案需求");
 
-    setLoading(true);
+    setSaving(true);
     try {
-      const user = auth.currentUser;
-      const teacherToken = Math.random().toString(36).substring(2, 10); // 隨機產生導師查看 Token
-
-      const projectData = {
+      const docRef = await addDoc(collection(db, "projects"), {
         name,
-        slug,
-        fileRequirements: validFiles,
-        teacherToken,
-        adminEmail: user?.email || "unknown",
+        startTime,
+        endTime,
+        allowResubmit,
+        fileRequirements: validReqs,
+        collaborators: [], // 新增：存放導師與小老師名單
         createdAt: Date.now(),
-      };
-
-      // 寫入 Firestore
-      await setDoc(doc(db, "projects", slug), projectData);
-      
+        students: []
+      });
       alert("專案建立成功！");
-      // 導向專案管理頁
-      router.push(`/admin/${slug}`);
+      router.push(`/admin/${docRef.id}`);
     } catch (error: any) {
-      console.error("建立失敗:", error);
-      alert("建立失敗，請確認你的帳號是否已登入，以及 Firestore 規則是否允許寫入。");
-    } finally {
-      setLoading(false);
+      alert("建立失敗: " + error.message);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-12">
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-sm border">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">新增專案</h1>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 專案基本資訊 */}
-          <div className="space-y-4">
+    <div className="min-h-screen relative overflow-hidden bg-slate-50 p-4 md:p-10 flex justify-center">
+      <div className="relative z-10 w-full max-w-2xl bg-white/40 backdrop-blur-2xl border border-white/60 p-8 md:p-10 rounded-[2rem] shadow-sm">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold text-slate-800">新增專案</h1>
+          <Link href="/admin" className="text-sm text-blue-600 font-medium hover:underline">返回總覽</Link>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">專案名稱</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 bg-white/60 border rounded-xl text-sm" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">專案名稱</label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="例: 302 班 網頁設計期末專題"
-                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
-              />
+              <label className="block text-sm font-semibold text-slate-700 mb-2">開放上傳時間</label>
+              <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full px-4 py-3 bg-white/60 border rounded-xl text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">專案 ID (網址代碼，只能英文或數字)</label>
-              <input
-                type="text"
-                required
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.replace(/[^a-zA-Z0-9-]/g, ''))}
-                placeholder="例: 302-final-project"
-                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-              />
+              <label className="block text-sm font-semibold text-slate-700 mb-2">截止時間</label>
+              <input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-full px-4 py-3 bg-white/60 border rounded-xl text-sm" />
             </div>
           </div>
 
-          <hr />
+          {/* 新增功能 7, 8：重複繳交開關 */}
+          <label className="flex items-center gap-3 p-4 bg-white/50 border rounded-xl cursor-pointer">
+            <input type="checkbox" checked={allowResubmit} onChange={e => setAllowResubmit(e.target.checked)} className="w-5 h-5 text-blue-600 rounded" />
+            <div>
+              <p className="text-sm font-bold text-slate-800">允許學生在截止前更換檔案</p>
+              <p className="text-xs text-slate-500">若關閉，學生上傳成功後將「不可重複繳交」</p>
+            </div>
+          </label>
 
-          {/* 檔案收取設定 */}
-          <div>
-            <div className="flex justify-between items-center mb-3">
-              <label className="block text-sm font-medium text-gray-700">需要收取的檔案</label>
-              <button
-                type="button"
-                onClick={addFileRequirement}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
-                + 新增檔案欄位
-              </button>
+          <div className="pt-4 border-t border-white/50">
+            <div className="flex justify-between items-center mb-4">
+              <label className="block text-sm font-semibold text-slate-700">需繳交檔案項目</label>
+              <button onClick={handleAddRequirement} className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-medium">+ 新增項目</button>
             </div>
             
             <div className="space-y-3">
-              {files.map((file, index) => (
-                <div key={file.id} className="flex gap-2 items-start">
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      required
-                      value={file.title}
-                      onChange={(e) => updateFile(index, "title", e.target.value)}
-                      placeholder="檔案顯示名稱 (例: 專題企劃書 PDF)"
-                      className="w-full px-3 py-2 border rounded-md text-sm outline-none"
-                    />
-                  </div>
-                  <div className="w-24">
-                    <select
-                      value={file.ext}
-                      onChange={(e) => updateFile(index, "ext", e.target.value)}
-                      className="w-full px-2 py-2 border rounded-md text-sm outline-none bg-gray-50"
-                    >
-                      <option value="*">無限制</option>
-                      <option value=".pdf">PDF</option>
-                      <option value=".docx">DOCX</option>
-                      <option value=".pptx">PPTX</option>
-                      <option value=".zip">ZIP</option>
-                      <option value="image/*">圖片</option>
-                    </select>
-                  </div>
-                  {files.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeFile(index)}
-                      className="text-red-500 px-2 py-2 hover:bg-red-50 rounded"
-                    >
-                      ✕
-                    </button>
-                  )}
+              {requirements.map((req, index) => (
+                <div key={req.id} className="flex gap-2">
+                  <input type="text" value={req.title} onChange={(e) => handleRequirementChange(index, "title", e.target.value)} placeholder="檔案名稱" className="flex-1 px-3 py-2 bg-white/60 border rounded-xl text-sm" />
+                  <input type="text" value={req.ext} onChange={(e) => handleRequirementChange(index, "ext", e.target.value)} placeholder="副檔名" className="w-24 px-3 py-2 bg-white/60 border rounded-xl text-sm" />
+                  {requirements.length > 1 && <button onClick={() => handleRemoveRequirement(index)} className="p-2 text-red-400">✕</button>}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="pt-4 flex gap-3">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-blue-600 text-white font-medium py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {loading ? "建立中..." : "建立專案"}
-            </button>
-          </div>
-        </form>
+          <button onClick={handleSave} disabled={saving} className="w-full mt-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all">
+            {saving ? "建立中..." : "建立專案"}
+          </button>
+        </div>
       </div>
     </div>
   );
