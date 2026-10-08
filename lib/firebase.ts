@@ -1,31 +1,20 @@
 // lib/firebase.ts
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getAuth } from "firebase/auth"; // 新增這行
 
-// 加上 || "未設定" 的預設值，防止 Firebase 吃到 undefined 直接崩潰
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "未設定",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "未設定",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "未設定",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "未設定",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "未設定",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "未設定",
+  // 這裡維持你原本的設定檔，不要改動
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: any;
-let db: any = null;
-let auth: any = null;
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app);
+const auth = getAuth(app); // 新增這行
 
-// 只在瀏覽器環境啟動，且包裝在 try...catch 中，嚴格防止當機
-if (typeof window !== "undefined") {
-  try {
-    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    db = getFirestore(app);
-    auth = getAuth(app);
-  } catch (error) {
-    console.error("Firebase 初始化嚴重錯誤:", error);
-  }
-}
-
-export { app, db, auth };
+export { db, auth }; // 把 auth 一起 export 出去
