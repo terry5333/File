@@ -13,7 +13,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // 🔒 安全白名單：只有寫在這裡的 Google 信箱才能登入管理後台！
   const ADMIN_EMAILS = [
-    "terrylie0215@gmail.com@gmail.com", // ← ⚠️ 請務必把它改成你自己的 Google 信箱
+    "terrylie0215@gmail.com", // ← ⚠️ 請務必把它改成你自己的 Google 信箱
   ];
 
   useEffect(() => {
