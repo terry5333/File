@@ -8,166 +8,136 @@ import { db } from "@/lib/firebase";
 export default function StudentUploadPage({ params }: { params: { projectId: string } }) {
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
   const [inputCode, setInputCode] = useState("");
   const [matchedStudent, setMatchedStudent] = useState<any>(null);
-  const [isIdentityConfirmed, setIsIdentityConfirmed] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [existingSubmissions, setExistingSubmissions] = useState<any>({}); 
-  const [filesData, setFilesData] = useState<{ [reqId: string]: File | null }>({});
-  const [uploadStatus, setUploadStatus] = useState<{ [reqId: string]: string }>({});
+  const [existingSubmissions, setExistingSubmissions] = useState<any>({}); // 儲存已繳交紀錄
+  const [filesData, setFilesData] = useState<any>({});
   
   const [isUploadingAll, setIsUploadingAll] = useState(false);
   const [isAllCompleted, setIsAllCompleted] = useState(false); 
 
   useEffect(() => {
     getDoc(doc(db, "projects", params.projectId)).then((snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.fileRequirements) {
-          data.fileRequirements = data.fileRequirements.map((req: any, idx: number) => ({ ...req, id: req.id || `req_legacy_${idx}` }));
-        }
-        setProject(data);
-      }
+      if (snap.exists()) setProject(snap.data());
       setLoading(false);
     });
   }, [params.projectId]);
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg("");
-    const trimmed = inputCode.trim();
-    const found = project?.students?.find((s: any) => s.code === trimmed);
+    const found = project?.students?.find((s: any) => s.code === inputCode.trim());
     if (found) {
       setMatchedStudent(found);
-      setIsIdentityConfirmed(false);
+      // 登入時，立刻去資料庫抓他過去交過的檔案
       const q = query(collection(db, "projects", params.projectId, "submissions"), where("studentCode", "==", found.code));
       const snap = await getDocs(q);
       const ex: any = {};
       snap.forEach(d => { ex[d.data().reqId] = d.data(); });
       setExistingSubmissions(ex);
     } else {
-      setErrorMsg("找不到此代號，請再次確認您的代號是否正確。");
-    }
-  };
-
-  const handleFileChange = (reqId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFilesData(prev => ({ ...prev, [reqId]: e.target.files![0] }));
-      setUploadStatus(prev => ({ ...prev, [reqId]: "selected" }));
+      alert("找不到此代號！");
     }
   };
 
   const handleUploadAll = async () => {
     const requirements = project.fileRequirements || [];
+    
+    // 檢查：如果「沒有舊檔案」也「沒選新檔案」，就是漏交
     const missing = requirements.filter((req: any) => !filesData[req.id] && !existingSubmissions[req.id]);
-    if (missing.length > 0) return alert(`您還有檔案尚未選擇！`);
+    if (missing.length > 0) return alert("您還有檔案尚未選擇！");
 
     const filesToUpload = requirements.filter((req: any) => filesData[req.id]);
-    if (filesToUpload.length === 0) return alert("您沒有選擇任何新檔案");
+    if (filesToUpload.length === 0) return alert("沒有選擇需要更新的新檔案");
 
     setIsUploadingAll(true);
-    let hasError = false;
-
     for (const req of filesToUpload) {
       const file = filesData[req.id];
-      if (!file) continue;
-      setUploadStatus(prev => ({ ...prev, [req.id]: "uploading" }));
-
       try {
-        const urlRes = await fetch("/api/sign", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: file.name, contentType: file.type, projectId: params.projectId, studentCode: matchedStudent.code, reqId: req.id }),
+        const res = await fetch("/api/sign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, contentType: file.type, projectId: params.projectId, studentCode: matchedStudent.code, reqId: req.id })
         });
-        const apiData = await urlRes.json();
+        const apiData = await res.json();
+        
         await fetch(apiData.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+
         await setDoc(doc(db, "projects", params.projectId, "submissions", `${matchedStudent.code}_${req.id}`), {
-          studentCode: matchedStudent.code, studentName: matchedStudent.name, studentSeat: matchedStudent.seat, reqId: req.id, fileKey: apiData.fileKey, filename: file.name, submittedAt: Date.now()
+          studentCode: matchedStudent.code,
+          studentName: matchedStudent.name,
+          studentSeat: matchedStudent.seat,
+          reqId: req.id,
+          fileKey: apiData.fileKey,
+          filename: file.name,
+          submittedAt: Date.now()
         });
-        setUploadStatus(prev => ({ ...prev, [req.id]: "success" }));
-      } catch (error: any) {
-        setUploadStatus(prev => ({ ...prev, [req.id]: "error" }));
-        hasError = true;
+      } catch (e) {
+        console.error("上傳失敗", e);
       }
     }
     setIsUploadingAll(false);
-    if (!hasError) setIsAllCompleted(true);
+    setIsAllCompleted(true);
   };
 
-  // 🌟 移除文字與轉圈動畫，直接給乾淨的背景
-  if (loading) return <div className="min-h-screen bg-slate-50"></div>;
+  if (loading) return <div>載入中...</div>;
 
-  if (!project) return <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 text-slate-500 font-bold">找不到此專案</div>;
+  if (isAllCompleted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="p-10 bg-white rounded-3xl text-center shadow-lg">
+          <h2 className="text-2xl font-bold text-emerald-600 mb-2">🎉 檔案已成功送出！</h2>
+          <p className="text-slate-500">若需再次更換，請重新登入。</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-slate-100 rounded">返回</button>
+        </div>
+      </div>
+    );
+  }
 
-  const isUploadEnabled = project.isUploadEnabled !== false;
-  const allowResubmit = project.allowResubmit !== false;
+  const allowResubmit = project.allowResubmit !== false; // 是否允許重複繳交
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-slate-50 p-4 md:p-10 flex items-center justify-center">
-      <div className="fixed top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-blue-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none"></div>
-      <div className="fixed bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none"></div>
-
-      <div className="relative z-10 w-full max-w-md">
-        <div className="bg-white/40 backdrop-blur-2xl border border-white/60 p-8 md:p-10 rounded-[2rem] shadow-sm">
-          
-          <div className="text-center mb-8">
-            <span className="px-3 py-1 bg-blue-100 text-blue-700 font-bold text-xs rounded-lg shadow-sm">學生繳交專區</span>
-            <h1 className="text-2xl font-bold text-slate-800 mt-3">{project.name}</h1>
-          </div>
-
-          {!isUploadEnabled ? (
-            <div className="p-8 bg-slate-100/80 border border-slate-200 rounded-2xl text-center shadow-sm">
-              <p className="text-xl font-bold text-slate-800 mb-2">上傳功能已關閉</p>
+    <div className="min-h-screen bg-slate-50 p-6 flex items-center justify-center">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
+        <h1 className="text-2xl font-bold text-center mb-6">{project.name}</h1>
+        
+        {!matchedStudent ? (
+          <form onSubmit={handleVerifyCode} className="space-y-4">
+            <input type="text" value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="輸入專屬代號" className="w-full px-4 py-3 border rounded-xl" />
+            <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold">登入系統</button>
+          </form>
+        ) : (
+          <div className="space-y-6">
+            <div className="p-4 bg-blue-50 rounded-xl text-center font-bold text-blue-800">
+              {matchedStudent.seat} 號 - {matchedStudent.name}
             </div>
-          ) : !matchedStudent ? (
-            <form onSubmit={handleVerifyCode} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">請輸入您的登入代號</label>
-                <input type="text" required value={inputCode} onChange={(e) => setInputCode(e.target.value)} placeholder="例：a01" className="w-full px-4 py-3.5 bg-white/60 border border-white/80 rounded-2xl text-slate-800 text-center text-lg font-mono tracking-wider outline-none focus:ring-2 focus:ring-blue-400" />
-              </div>
-              {errorMsg && <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-xl text-center">{errorMsg}</div>}
-              <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl shadow-lg transition-all">登入系統</button>
-            </form>
-          ) : !isIdentityConfirmed ? (
-            <div className="space-y-6">
-              <div className="p-8 bg-white/60 rounded-2xl text-center">
-                <p className="text-sm text-slate-500 font-bold mb-1">請確認您的身分</p>
-                <p className="text-2xl font-bold text-slate-800">{matchedStudent.seat} 號 - {matchedStudent.name}</p>
-              </div>
-              <div className="space-y-3">
-                <button onClick={() => setIsIdentityConfirmed(true)} className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl shadow-lg">確認無誤，開始繳交</button>
-                <button onClick={() => { setMatchedStudent(null); setInputCode(""); }} className="w-full py-3.5 bg-white/60 text-slate-600 font-bold rounded-2xl shadow-sm">不是我，重新輸入</button>
-              </div>
-            </div>
-          ) : isAllCompleted ? (
-            <div className="p-10 bg-white/70 rounded-3xl text-center">
-              <h2 className="text-2xl font-bold text-slate-800">繳交完成！</h2>
-              <button onClick={() => window.location.reload()} className="mt-6 px-6 py-2.5 bg-slate-100 font-bold rounded-xl text-sm">返回首頁</button>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center p-4 bg-white/50 rounded-2xl">
-                <div><p className="text-xs text-slate-400 font-bold">目前身分</p><p className="text-sm font-bold text-slate-700">{matchedStudent.name}</p></div>
-                <button onClick={() => { setMatchedStudent(null); setIsIdentityConfirmed(false); }} className="text-xs px-3 py-1.5 bg-slate-200/50 font-bold rounded-lg">登出</button>
-              </div>
 
-              <div className="space-y-4">
-                {project.fileRequirements?.map((req: any, index: number) => {
-                  const existing = existingSubmissions[req.id];
-                  return (
-                    <div key={index} className="p-4 bg-white/50 rounded-2xl space-y-3">
-                      <div className="flex justify-between font-bold text-sm"><span>{req.title}</span><span className="text-xs text-slate-400">格式: {req.ext}</span></div>
-                      {existing && <div className="bg-emerald-50 p-2.5 rounded-xl font-bold text-xs text-emerald-700">✅ 之前已繳交</div>}
-                      {(!existing || allowResubmit) && <input type="file" accept={req.ext === "*" ? "" : req.ext} onChange={(e) => handleFileChange(req.id, e)} className="w-full text-xs font-bold text-slate-500" />}
+            {project.fileRequirements.map((req: any) => {
+              const existing = existingSubmissions[req.id]; // 抓取這個欄位有沒有舊紀錄
+              
+              return (
+                <div key={req.id} className="p-4 border rounded-xl">
+                  <h3 className="font-bold mb-2">{req.title}</h3>
+                  
+                  {existing ? (
+                    <div className="mb-2">
+                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded mr-2">✅ 已於 {new Date(existing.submittedAt).toLocaleDateString()} 繳交</span>
+                      {!allowResubmit && <span className="text-xs text-red-500">(不可更換)</span>}
                     </div>
-                  );
-                })}
-              </div>
-              <button onClick={handleUploadAll} disabled={isUploadingAll} className="w-full py-4 bg-emerald-600 text-white font-bold rounded-2xl shadow-lg">
-                {isUploadingAll ? "處理中..." : "確認送出"}
-              </button>
-            </div>
-          )}
-        </div>
+                  ) : null}
+
+                  {(!existing || allowResubmit) ? (
+                    <input type="file" onChange={(e) => setFilesData({ ...filesData, [req.id]: e.target.files?.[0] })} className="text-sm" />
+                  ) : null}
+                </div>
+              );
+            })}
+
+            <button onClick={handleUploadAll} disabled={isUploadingAll} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold">
+              {isUploadingAll ? "上傳中..." : "確認送出"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
