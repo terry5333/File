@@ -26,19 +26,28 @@ export default function ProjectLayout({
   const copyStudentLink = () => {
     const link = `${window.location.origin}/${params.projectId}`;
     navigator.clipboard.writeText(link);
-    alert("🔗 學生上傳連結已複製到剪貼簿！\n\n您現在可以直接把這個連結貼給學生了。");
+    alert("🔗 學生上傳連結已複製到剪貼簿！");
+  };
+
+  // 🌟 舊專案的「一鍵直接複製導師連結」功能
+  const copyLegacyTeacherLink = () => {
+    if (!project?.teacherToken) return;
+    const link = `${window.location.origin}/teacher/${params.projectId}?token=${project.teacherToken}`;
+    navigator.clipboard.writeText(link);
+    alert("📋 導師專屬連結已複製！(無需輸入姓名即可直接使用)");
   };
 
   if (!project) return <div className="p-12 text-center text-slate-500 font-medium">載入專案資訊中...</div>;
 
+  // 判斷是否為舊專案（有舊版的 teacherToken）
+  const isLegacyProject = Boolean(project.teacherToken);
+
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 relative">
-      
-      {/* 加上跟首頁一樣的光暈，讓毛玻璃效果更明顯 */}
       <div className="fixed top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-blue-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none z-0"></div>
       <div className="fixed bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none z-0"></div>
 
-      {/* 🌟 舊版超美玻璃質感頂部卡片 (復刻截圖排版) */}
+      {/* 🌟 超美玻璃質感頂部卡片 */}
       <div className="relative z-10 bg-white/40 backdrop-blur-2xl p-6 md:p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] border border-white/60">
         
         <div className="flex items-center gap-4 mb-6">
@@ -49,21 +58,33 @@ export default function ProjectLayout({
           <div className="min-w-0 flex-1">
             <h1 className="text-xl md:text-2xl font-bold text-slate-800 truncate">{project.name}</h1>
             <p className="text-[11px] text-slate-500 mt-1.5 font-mono bg-white/60 inline-block px-2.5 py-1 rounded-lg border border-white/80 shadow-sm">
-              專案 ID: {project.id}
+              專案 ID: {project.id} {isLegacyProject && "• (舊版專案模式)"}
             </p>
           </div>
         </div>
 
-        {/* 滿版大按鈕：複製學生上傳連結 */}
-        <button 
-          onClick={copyStudentLink}
-          className="w-full py-4 mb-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-          複製學生上傳連結
-        </button>
+        {/* 🌟 根據新舊專案動態顯示按鈕 */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <button 
+            onClick={copyStudentLink}
+            className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+            複製學生上傳連結
+          </button>
 
-        {/* 毛玻璃頁籤 Tab */}
+          {/* 如果是舊專案，直接顯示一鍵複製導師連結按鈕 */}
+          {isLegacyProject && (
+            <button 
+              onClick={copyLegacyTeacherLink}
+              className="flex-1 py-3.5 bg-white/80 border border-indigo-200 text-indigo-700 font-bold rounded-2xl shadow-sm hover:bg-white transition-all flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-7M18 5h2a2 2 0 012 2v3m-4-3L10 14m2-5h6"></path></svg>
+              一鍵複製導師連結 (舊專案)
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-3">
           <Link 
             href={`/admin/${params.projectId}`} 
@@ -80,11 +101,9 @@ export default function ProjectLayout({
         </div>
       </div>
 
-      {/* 下方的子頁面內容 (包含 page.tsx 與 students/page.tsx) */}
       <div className="relative z-10">
         {children}
       </div>
-
     </div>
   );
 }
