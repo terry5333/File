@@ -111,16 +111,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // 驗證成功，放行進入 admin 裡面的頁面，並在右上角提供浮動登出按鈕
+  // 驗證成功，放行進入 admin 裡面的頁面，並在上方提供一個整齊的登出列
   return (
-    <>
-      <button 
-        onClick={handleLogout}
-        className="fixed top-4 right-4 z-50 px-4 py-2 bg-white/80 backdrop-blur border border-slate-200 text-slate-600 text-xs font-bold rounded-full shadow-sm hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
-      >
-        登出 {user.email}
-      </button>
-      {children}
-    </>
+    <div className="min-h-screen bg-slate-50 relative flex flex-col">
+      {/* 頂部導覽/登出列 */}
+      <div className="w-full bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-slate-800 rounded flex items-center justify-center">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+          </div>
+          <span className="text-sm font-bold text-slate-700 hidden sm:inline">管理員後台</span>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium text-slate-500 truncate max-w-[150px] sm:max-w-xs">
+            {user.email}
+          </span>
+          <button 
+            onClick={handleLogout}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 text-xs font-bold rounded-lg border border-slate-200 hover:border-red-200 transition-all whitespace-nowrap"
+          >
+            登出
+          </button>
+        </div>
+      </div>
+
+      {/* 主要內容區塊 */}
+      <div className="flex-1 relative z-10">
+        {children}
+      </div>
+    </div>
   );
 }
