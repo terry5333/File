@@ -32,45 +32,55 @@ export default function ProjectLayout({
   if (!project) return <div className="p-12 text-center text-slate-500 font-medium">載入專案資訊中...</div>;
 
   return (
-    <div className="p-4 md:p-10 max-w-6xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 relative">
       
-      {/* 🌟 舊版超美玻璃質感頂部卡片 */}
-      <div className="bg-white/40 backdrop-blur-2xl p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] border border-white/60">
-        <Link href="/admin" className="text-sm text-blue-600 hover:underline mb-4 inline-block font-medium">← 返回專案總覽</Link>
+      {/* 加上跟首頁一樣的光暈，讓毛玻璃效果更明顯 */}
+      <div className="fixed top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-blue-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none z-0"></div>
+      <div className="fixed bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none z-0"></div>
+
+      {/* 🌟 舊版超美玻璃質感頂部卡片 (復刻截圖排版) */}
+      <div className="relative z-10 bg-white/40 backdrop-blur-2xl p-6 md:p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] border border-white/60">
         
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-white/50 pb-6 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">{project.name}</h1>
-            <span className="font-mono text-xs bg-white/60 text-slate-500 px-3 py-1 rounded-lg border border-white/80 shadow-sm">
+        <div className="flex items-center gap-4 mb-6">
+          <Link href="/admin" className="flex flex-col items-center justify-center w-[4.5rem] h-[4.5rem] bg-white/60 border border-white/80 rounded-2xl text-slate-600 hover:bg-white shadow-sm transition-all shrink-0">
+            <svg className="w-5 h-5 mb-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            <span className="text-[10px] font-bold">切換專案</span>
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl md:text-2xl font-bold text-slate-800 truncate">{project.name}</h1>
+            <p className="text-[11px] text-slate-500 mt-1.5 font-mono bg-white/60 inline-block px-2.5 py-1 rounded-lg border border-white/80 shadow-sm">
               專案 ID: {project.id}
-            </span>
+            </p>
           </div>
-          
-          <button 
-            onClick={copyStudentLink}
-            className="w-full md:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-3 text-lg"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-            複製學生上傳連結
-          </button>
         </div>
 
-        <div className="flex gap-4">
+        {/* 滿版大按鈕：複製學生上傳連結 */}
+        <button 
+          onClick={copyStudentLink}
+          className="w-full py-4 mb-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+          複製學生上傳連結
+        </button>
+
+        {/* 毛玻璃頁籤 Tab */}
+        <div className="flex gap-3">
           <Link 
             href={`/admin/${params.projectId}`} 
-            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-sm ${pathname === `/admin/${params.projectId}` ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-white/60 text-slate-600 hover:bg-white border border-white/80'}`}
+            className={`flex-1 py-3.5 text-sm font-bold text-center rounded-xl transition-all shadow-sm ${pathname === `/admin/${params.projectId}` ? 'bg-white text-blue-600 border border-white/80' : 'bg-white/40 text-slate-600 hover:bg-white/60 border border-transparent'}`}
           >
             繳交狀態看板
           </Link>
           <Link 
             href={`/admin/${params.projectId}/students`} 
-            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-sm ${pathname === `/admin/${params.projectId}/students` ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-white/60 text-slate-600 hover:bg-white border border-white/80'}`}
+            className={`flex-1 py-3.5 text-sm font-bold text-center rounded-xl transition-all shadow-sm ${pathname === `/admin/${params.projectId}/students` ? 'bg-white text-blue-600 border border-white/80' : 'bg-white/40 text-slate-600 hover:bg-white/60 border border-transparent'}`}
           >
             學生名單管理
           </Link>
         </div>
       </div>
 
+      {/* 下方的子頁面內容 (包含 page.tsx 與 students/page.tsx) */}
       <div className="relative z-10">
         {children}
       </div>
