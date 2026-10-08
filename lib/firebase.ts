@@ -1,20 +1,39 @@
-// lib/firebase.ts
-import { initializeApp, getApps } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+// app/api/sign/delete/route.ts
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { NextResponse } from "next/server";
 
-const firebaseConfig = {
-  // 加上 || "mock_key" 是為了防止 Vercel 在 Build 階段因為找不到變數而報錯
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "mock_key",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+export async function POST(req: Request) {
+  try {
+    const { fileKey } = await req.json();
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
-const auth = getAuth(app);
+    if (!fileKey) {
+      return NextResponse.json({ error: "缺少檔案 Key，無法刪除" }, { status: 400 });
+    }
 
-export { db, auth };
+    // 每次呼叫時才初始化，確保能抓到最新的環境變數
+    const s3Client = new S3Client({
+      region: "auto",
+      endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+      },
+    });
+
+    const command = new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: fileKey, 
+    });
+
+    await s3Client.send(command);
+    console.log(`✅ 成功從 R2 刪除實體檔案: ${fileKey}`);
+
+    return NextResponse.json({ success: true, message: "實體檔案刪除成功" });
+  } catch (error: any) {
+    console.error("❌ R2 刪除檔案失敗:", error);
+    return NextResponse.json(
+      { error: error.message || "無法從 R2 刪除檔案" },
+      { status: 500 }
+    );
+  }
+}
