@@ -1,114 +1,66 @@
-// app/teacher/[projectId]/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-export default function TeacherProjectDashboardPage({ params }: { params: { projectId: string } }) {
+export default function ProjectLayout({ children, params }: { children: React.ReactNode; params: { projectId: string }; }) {
   const [project, setProject] = useState<any>(null);
-  const [submissions, setSubmissions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [identity, setIdentity] = useState<any>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const snap = await getDoc(doc(db, "projects", params.projectId));
-        if (snap.exists()) {
-          const data = snap.data();
-          const urlParams = new URLSearchParams(window.location.search);
-          const urlToken = urlParams.get("token");
-
-          // 驗證 Token 是否存在於 collaborators 陣列
-          const foundCollab = (data.collaborators || []).find((c: any) => c.token === urlToken);
-          if (!foundCollab) {
-            setLoading(false);
-            return; // 驗證失敗，identity 為 null
-          }
-          
-          setIdentity(foundCollab);
-          setProject(data);
-          
-          const subSnap = await getDocs(collection(db, "projects", params.projectId, "submissions"));
-          setSubmissions(subSnap.docs.map(d => d.data()));
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    getDoc(doc(db, "projects", params.projectId)).then((snap) => {
+      if (snap.exists()) setProject({ id: snap.id, ...snap.data() });
+    });
   }, [params.projectId]);
 
-  const handlePreview = async (fileKey: string) => {
-    const res = await fetch("/api/sign/read", { method: "POST", body: JSON.stringify({ fileKey }) });
-    const data = await res.json();
-    window.open(data.url, "_blank");
+  const copyStudentLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/${params.projectId}`);
+    alert("🔗 學生上傳連結已複製到剪貼簿！");
   };
 
-  if (loading) return <div className="p-12 text-center">驗證身分中...</div>;
+  const copyLegacyTeacherLink = () => {
+    if (!project?.teacherToken) return;
+    navigator.clipboard.writeText(`${window.location.origin}/teacher/${params.projectId}?token=${project.teacherToken}`);
+    alert("📋 導師專屬連結已複製！");
+  };
 
-  if (!identity) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="bg-white p-8 rounded-xl shadow border border-red-200 text-center">
-          <h1 className="text-xl font-bold text-red-500 mb-2">❌ 存取遭拒</h1>
-          <p className="text-slate-500">專屬連結無效或已失效，請聯絡管理員。</p>
-        </div>
-      </div>
-    );
-  }
-
-  const students = project?.students || [];
-  const requirements = project?.fileRequirements || [];
+  if (!project) return <div className="min-h-screen bg-slate-50/50"></div>;
+  const isLegacyProject = Boolean(project.teacherToken);
 
   return (
-    <div className="p-4 md:p-10 max-w-6xl mx-auto">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <div className="mb-6 border-b pb-4">
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">身分：{identity.role}</span>
-          <h2 className="text-2xl font-bold mt-2">{project.name}</h2>
-          <p className="text-slate-500 mt-1">歡迎登入，{identity.name}！您可以在此檢視繳交進度。</p>
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 relative">
+      <div className="fixed top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-blue-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none z-0"></div>
+      <div className="fixed bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-300/20 rounded-full mix-blend-multiply filter blur-[100px] opacity-70 pointer-events-none z-0"></div>
+
+      <div className="relative z-10 bg-white/40 backdrop-blur-2xl p-6 md:p-8 rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] border border-white/60">
+        <div className="flex items-center gap-4 mb-6">
+          <Link href="/admin" className="flex flex-col items-center justify-center w-[4.5rem] h-[4.5rem] bg-white/60 border border-white/80 rounded-2xl text-slate-600 hover:bg-white shadow-sm transition-all shrink-0">
+            <span className="text-[10px] font-bold">切換專案</span>
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl md:text-2xl font-bold text-slate-800 truncate">{project.name}</h1>
+            <p className="text-[11px] text-slate-500 mt-1.5 font-mono bg-white/60 inline-block px-2.5 py-1 rounded-lg border border-white/80 shadow-sm">
+              專案 ID: {project.id} {isLegacyProject && "• (舊版專案模式)"}
+            </p>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="py-3 px-4">座號/姓名</th>
-                {requirements.map((req: any) => <th key={req.id} className="py-3 px-4">{req.title}</th>)}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {students.map((student: any) => (
-                <tr key={student.code} className="hover:bg-slate-50">
-                  <td className="py-3 px-4 font-bold">{student.seat} {student.name}</td>
-                  {requirements.map((req: any) => {
-                    const sub = submissions.find(s => s.studentCode === student.code && s.reqId === req.id);
-                    return (
-                      <td key={req.id} className="py-3 px-4">
-                        {sub ? (
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">✅ 已交</span>
-                              <button onClick={() => handlePreview(sub.fileKey)} className="text-xs text-blue-600 underline">預覽檔案</button>
-                            </div>
-                            <span className="text-[10px] text-slate-400">
-                              {new Date(sub.submittedAt).toLocaleString('zh-TW')}
-                            </span>
-                          </div>
-                        ) : <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">未繳交</span>}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <button onClick={copyStudentLink} className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2">複製學生上傳連結</button>
+          {isLegacyProject && (
+            <button onClick={copyLegacyTeacherLink} className="flex-1 py-3.5 bg-white/80 border border-indigo-200 text-indigo-700 font-bold rounded-2xl shadow-sm hover:bg-white transition-all flex items-center justify-center gap-2">一鍵複製導師連結</button>
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <Link href={`/admin/${params.projectId}`} className={`flex-1 py-3.5 text-sm font-bold text-center rounded-xl transition-all shadow-sm ${pathname === `/admin/${params.projectId}` ? 'bg-white text-blue-600 border border-white/80' : 'bg-white/40 text-slate-600 hover:bg-white/60 border border-transparent'}`}>繳交狀態看板</Link>
+          <Link href={`/admin/${params.projectId}/students`} className={`flex-1 py-3.5 text-sm font-bold text-center rounded-xl transition-all shadow-sm ${pathname === `/admin/${params.projectId}/students` ? 'bg-white text-blue-600 border border-white/80' : 'bg-white/40 text-slate-600 hover:bg-white/60 border border-transparent'}`}>學生名單管理</Link>
         </div>
       </div>
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }
