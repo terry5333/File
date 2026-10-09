@@ -1,5 +1,6 @@
 // app/layout.tsx
 import "./globals.css";
+import { GoogleAnalytics } from '@next/third-parties/google';
 
 export const metadata = {
   title: "302 檔案上傳系統",
@@ -14,11 +15,16 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
-        {/* 終極解法：強制從雲端載入 Tailwind，無視所有資料夾錯位問題 */}
+        {/* 我們之前加的 Tailwind 雲端載入 */}
         <script src="https://cdn.tailwindcss.com"></script>
       </head>
       <body className="bg-slate-50 text-slate-900 antialiased">
         {children}
+        
+        {/* 🌟 接入 GA4：會自動讀取環境變數中的 GA ID */}
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
+        )}
       </body>
     </html>
   );
