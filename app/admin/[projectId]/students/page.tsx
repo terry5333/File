@@ -12,6 +12,7 @@ export default function StudentManagementPage({ params }: { params: { projectId:
 
   const [newStudentSeat, setNewStudentSeat] = useState("");
   const [newStudentName, setNewStudentName] = useState("");
+  const [newStudentCode, setNewStudentCode] = useState(""); // 🌟 新增：手動輸入代號的狀態
   const [selectedImportProjectId, setSelectedImportProjectId] = useState("");
 
   useEffect(() => {
@@ -37,13 +38,29 @@ export default function StudentManagementPage({ params }: { params: { projectId:
   }, [params.projectId]);
 
   const handleAddSingleStudent = async () => {
-    if (!newStudentSeat.trim() || !newStudentName.trim()) return alert("請填寫座號與姓名");
-    const code = Math.random().toString(36).substring(2, 6);
-    const newStudent = { seat: newStudentSeat, name: newStudentName, code };
+    if (!newStudentSeat.trim() || !newStudentName.trim() || !newStudentCode.trim()) {
+      return alert("請填寫座號、姓名與登入代號");
+    }
+    
+    // 檢查代號是否重複
+    const isCodeExist = (project?.students || []).some((s: any) => s.code === newStudentCode.trim());
+    if (isCodeExist) {
+      return alert(`❌ 代號「${newStudentCode}」已被使用，請換一個！`);
+    }
+
+    const newStudent = { 
+      seat: newStudentSeat.trim(), 
+      name: newStudentName.trim(), 
+      code: newStudentCode.trim() 
+    };
     const updated = [...(project.students || []), newStudent];
+    
     await updateDoc(doc(db, "projects", params.projectId), { students: updated });
     setProject({ ...project, students: updated });
-    setNewStudentSeat(""); setNewStudentName("");
+    
+    setNewStudentSeat(""); 
+    setNewStudentName("");
+    setNewStudentCode("");
     alert(`✅ 成功新增學生：${newStudentName}`);
   };
 
@@ -95,6 +112,8 @@ export default function StudentManagementPage({ params }: { params: { projectId:
               <div className="space-y-3">
                 <input type="text" value={newStudentSeat} onChange={e => setNewStudentSeat(e.target.value)} placeholder="座號 (例: 1)" className="w-full px-4 py-3 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-emerald-400 bg-white shadow-sm" />
                 <input type="text" value={newStudentName} onChange={e => setNewStudentName(e.target.value)} placeholder="姓名 (例: 王大明)" className="w-full px-4 py-3 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-emerald-400 bg-white shadow-sm" />
+                {/* 🌟 補回：手動輸入代號的欄位 */}
+                <input type="text" value={newStudentCode} onChange={e => setNewStudentCode(e.target.value)} placeholder="登入代號 (例: a01)" className="w-full px-4 py-3 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-emerald-400 bg-white shadow-sm font-mono" />
               </div>
             </div>
             <button onClick={handleAddSingleStudent} className="w-full py-3 mt-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-md">+ 新增學生</button>
