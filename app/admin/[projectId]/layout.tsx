@@ -1,3 +1,4 @@
+// app/admin/[projectId]/layout.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,12 +22,6 @@ export default function ProjectLayout({ children, params }: { children: React.Re
     alert("🔗 學生上傳連結已複製到剪貼簿！");
   };
 
-  const copyLegacyTeacherLink = () => {
-    if (!project?.teacherToken) return;
-    navigator.clipboard.writeText(`${window.location.origin}/teacher/${params.projectId}?token=${project.teacherToken}`);
-    alert("📋 導師專屬連結已複製！");
-  };
-
   if (!project) return <div className="min-h-screen bg-slate-50/50"></div>;
   const isLegacyProject = Boolean(project.teacherToken);
 
@@ -48,11 +43,11 @@ export default function ProjectLayout({ children, params }: { children: React.Re
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <button onClick={copyStudentLink} className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2">複製學生上傳連結</button>
-          {isLegacyProject && (
-            <button onClick={copyLegacyTeacherLink} className="flex-1 py-3.5 bg-white/80 border border-indigo-200 text-indigo-700 font-bold rounded-2xl shadow-sm hover:bg-white transition-all flex items-center justify-center gap-2">一鍵複製導師連結</button>
-          )}
+        {/* 🌟 統一改為只保留「複製學生上傳連結」的單一大按鈕 */}
+        <div className="mb-6">
+          <button onClick={copyStudentLink} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2">
+            複製學生上傳連結
+          </button>
         </div>
 
         <div className="flex gap-3">
