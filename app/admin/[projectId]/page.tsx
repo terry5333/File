@@ -13,6 +13,10 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // 🌟 新增：登入頁面提示詞狀態
+  const [loginHint, setLoginHint] = useState("");
+  const [savingHint, setSavingHint] = useState(false);
+
   const [collabName, setCollabName] = useState("");
   const [collabRole, setCollabRole] = useState("導師");
 
@@ -25,7 +29,11 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
     const fetchData = async () => {
       try {
         const snap = await getDoc(doc(db, "projects", params.projectId));
-        if (snap.exists()) setProject(snap.data());
+        if (snap.exists()) {
+          const data = snap.data();
+          setProject(data);
+          setLoginHint(data.loginHint || ""); // 讀取該專案已設定的登入提示字
+        }
 
         const subSnap = await getDocs(collection(db, "projects", params.projectId, "submissions"));
         setSubmissions(subSnap.docs.map(d => d.data()));
@@ -38,6 +46,21 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
     const newStatus = project?.isUploadEnabled !== false;
     setProject({ ...project, isUploadEnabled: !newStatus });
     await updateDoc(doc(db, "projects", params.projectId), { isUploadEnabled: !newStatus });
+  };
+
+  // 🌟 新增：儲存每個專案專屬的登入頁面提示字
+  const handleSaveLoginHint = async () => {
+    setSavingHint(true);
+    try {
+      const trimmedHint = loginHint.trim();
+      await updateDoc(doc(db, "projects", params.projectId), { loginHint: trimmedHint });
+      setProject({ ...project, loginHint: trimmedHint });
+      alert("✅ 登入頁面提示字已儲存！");
+    } catch (error: any) {
+      alert(`❌ 儲存失敗：${error.message}`);
+    } finally {
+      setSavingHint(false);
+    }
   };
 
   const handleAddRequirement = async () => {
@@ -127,6 +150,35 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
         <button onClick={toggleUploadStatus} className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors focus:outline-none shadow-inner border border-slate-200/50 ${project?.isUploadEnabled !== false ? 'bg-emerald-500' : 'bg-slate-300'}`}>
           <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-sm ${project?.isUploadEnabled !== false ? 'translate-x-7' : 'translate-x-1'}`} />
         </button>
+      </div>
+
+      {/* 🌟 新增區塊：每個專案專屬的「學生登入頁面提示字」設定 */}
+      <div className="bg-white/60 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] shadow-sm border border-white/80">
+        <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+          <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          學生登入頁面提示字
+        </h3>
+        <p className="text-xs md:text-sm text-slate-500 mb-4">
+          在此輸入的提示字會顯示在該專案「學生登入頁面」上方（每個專案可設定不同內容，留空儲存則不顯示）。
+        </p>
+        <div className="flex flex-col md:flex-row gap-3">
+          <input
+            type="text"
+            value={loginHint}
+            onChange={e => setLoginHint(e.target.value)}
+            placeholder="輸入自訂提示字 (例：請輸入學號後 4 碼登入、代碼為身分證後 4 碼...)"
+            className="w-full px-4 py-3 border border-white/80 rounded-xl flex-1 outline-none focus:ring-2 focus:ring-blue-400 bg-white/80 shadow-sm font-bold text-slate-700"
+          />
+          <button
+            onClick={handleSaveLoginHint}
+            disabled={savingHint}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-md whitespace-nowrap disabled:opacity-50"
+          >
+            {savingHint ? "儲存中..." : "💾 儲存提示字"}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] shadow-sm border border-white/80">
@@ -243,7 +295,7 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
                             <div className="flex items-center gap-2">
                               <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md font-bold shadow-sm">✅ 已交</span>
                               {/* 🌟 改成原生的 <a> 標籤，點擊直接觸發後端跳轉，永不被擋 */}
-                              <a href={`/api/preview?fileKey=${sub.fileKey}`} target="_blank" rel="noopener noreferrer" className="inline-block text-xs text-blue-600 hover:text-blue-800 font-bold border border-blue-200 bg-blue-50 px-2 py-1 rounded-md transition-colors text-center">預覽</a>
+                              <a href={`/api/preview?fileKey=${encodeURIComponent(sub.fileKey)}`} target="_blank" rel="noopener noreferrer" className="inline-block text-xs text-blue-600 hover:text-blue-800 font-bold border border-blue-200 bg-blue-50 px-2 py-1 rounded-md transition-colors text-center">預覽</a>
                               <button onClick={() => handleReturnFile(student.code, req.id, sub.fileKey)} className="text-xs text-red-500 hover:text-red-700 font-bold border border-red-200 bg-red-50 px-2 py-1 rounded-md transition-colors">退回</button>
                             </div>
                             <span className="text-[11px] text-slate-400 font-mono ml-1">{new Date(sub.submittedAt).toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
