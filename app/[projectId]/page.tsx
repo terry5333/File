@@ -20,7 +20,7 @@ export default function StudentUploadPage({ params }: { params: { projectId: str
   const [errorDetails, setErrorDetails] = useState<{ [reqId: string]: string }>({});
   
   const [isUploadingAll, setIsUploadingAll] = useState(false);
-  const [isAllCompleted, setIsAllCompleted] = useState(false); 
+  const [isUploadSuccess, setIsUploadSuccess] = useState(false); // 改為單次上傳成功狀態
 
   useEffect(() => {
     getDoc(doc(db, "projects", params.projectId)).then((snap) => {
@@ -77,13 +77,26 @@ export default function StudentUploadPage({ params }: { params: { projectId: str
     }
   };
 
+  // 🌟 新增：讓學生也能預覽已經上傳到雲端的檔案
+  const handlePreview = async (fileKey: string) => {
+    try {
+      const res = await fetch("/api/sign/read", { method: "POST", body: JSON.stringify({ fileKey }) });
+      const data = await res.json();
+      window.open(data.url, "_blank");
+    } catch (error) {
+      alert("無法取得預覽連結，請檢查網路連線。");
+    }
+  };
+
   const handleUploadAll = async () => {
     const requirements = project.fileRequirements || [];
-    const missing = requirements.filter((req: any) => !filesData[req.id] && !existingSubmissions[req.id]);
-    if (missing.length > 0) return alert(`您還有檔案尚未選擇！`);
-
+    
+    // 🌟 拔除強制所有檔案都要選的邏輯，現在只抓取「有選擇的新檔案」
     const filesToUpload = requirements.filter((req: any) => filesData[req.id]);
-    if (filesToUpload.length === 0) return alert("您沒有選擇任何新檔案");
+    
+    if (filesToUpload.length === 0) {
+      return alert("您沒有選擇任何新檔案喔！請先點擊選擇檔案。");
+    }
 
     setIsUploadingAll(true);
     let hasErrorOccurred = false;
@@ -119,7 +132,7 @@ export default function StudentUploadPage({ params }: { params: { projectId: str
     }
     
     setIsUploadingAll(false);
-    if (!hasErrorOccurred) setIsAllCompleted(true);
+    if (!hasErrorOccurred) setIsUploadSuccess(true);
   };
 
   const renderContent = () => {
@@ -151,13 +164,13 @@ export default function StudentUploadPage({ params }: { params: { projectId: str
       );
     }
 
-    if (isAllCompleted) {
+    if (isUploadSuccess) {
       return (
         <div className="p-10 bg-white/70 border border-white/80 rounded-3xl text-center shadow-sm space-y-4 min-h-[300px] flex flex-col justify-center items-center">
           <div className="w-24 h-24 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center shadow-inner"><svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></div>
-          <h2 className="text-2xl font-bold text-slate-800 mt-4">繳交完成！</h2>
-          <p className="text-slate-500 text-sm font-medium">您的檔案已成功送出，可以安心關閉此視窗了。</p>
-          <button onClick={() => window.location.reload()} className="mt-4 px-6 py-3 bg-white hover:bg-slate-50 text-slate-600 font-bold rounded-xl transition-all shadow-sm border border-slate-200">返回首頁</button>
+          <h2 className="text-2xl font-bold text-slate-800 mt-4">上傳成功！</h2>
+          <p className="text-slate-500 text-sm font-medium">您本次選擇的檔案已經成功送出。</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-6 py-3 bg-white hover:bg-slate-50 text-slate-600 font-bold rounded-xl transition-all shadow-sm border border-slate-200">返回繼續操作</button>
         </div>
       );
     }
@@ -212,7 +225,11 @@ export default function StudentUploadPage({ params }: { params: { projectId: str
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-bold text-slate-700 pl-1">需繳交的檔案項目：</h3>
+          <div className="flex justify-between items-center pl-1">
+            <h3 className="text-sm font-bold text-slate-700">需繳交的檔案項目：</h3>
+            <span className="text-[10px] text-slate-400 font-bold bg-white/60 px-2 py-1 rounded-md">✅ 支援分批繳交</span>
+          </div>
+
           {project.fileRequirements?.map((req: any, index: number) => {
             const existing = existingSubmissions[req.id];
             const isLocked = existing && project.allowResubmit === false;
@@ -224,18 +241,49 @@ export default function StudentUploadPage({ params }: { params: { projectId: str
                   <span className="text-[11px] font-mono bg-white/80 text-slate-500 px-2.5 py-1 rounded-lg border border-white shadow-sm">格式: {req.ext}</span>
                 </div>
 
+                {/* 🌟 檔案已上傳狀態 & 預覽按鈕 */}
                 {existing && (
                   <div className="bg-emerald-50/80 border border-emerald-100 p-3 rounded-xl flex items-center justify-between shadow-sm">
-                    <span className="text-xs font-bold text-emerald-700">✅ 之前已繳交</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-emerald-700">✅ 之前已繳交</span>
+                      <button 
+                        type="button" 
+                        onClick={() => handlePreview(existing.fileKey)} 
+                        className="text-xs text-blue-600 hover:text-blue-800 font-bold border border-blue-200 bg-blue-50 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        查看檔案
+                      </button>
+                    </div>
                     {isLocked && <span className="text-[10px] text-red-500 font-bold bg-red-50 px-2 py-1 rounded-md">不可更換</span>}
                   </div>
                 )}
 
+                {/* 上傳檔案選擇器與本地縮圖預覽 */}
                 {!isLocked && (
-                  <input type="file" accept={req.ext === "*" ? "" : req.ext} onChange={(e) => handleFileChange(req.id, e)} disabled={isUploadingAll || uploadStatus[req.id] === "success"} className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50 transition-colors bg-white/50 border border-white/80 rounded-xl shadow-sm p-1.5" />
+                  <div className="space-y-3">
+                    <input 
+                      type="file" 
+                      accept={req.ext === "*" ? "" : req.ext} 
+                      onChange={(e) => handleFileChange(req.id, e)} 
+                      disabled={isUploadingAll || uploadStatus[req.id] === "success"} 
+                      className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50 transition-colors bg-white/50 border border-white/80 rounded-xl shadow-sm p-1.5" 
+                    />
+                    
+                    {/* 🌟 學生選擇圖片後，立刻在手機上顯示縮圖確認 */}
+                    {filesData[req.id] && filesData[req.id]?.type.startsWith("image/") && (
+                      <div className="relative inline-block animate-fade-in mt-1">
+                        <img 
+                          src={URL.createObjectURL(filesData[req.id] as File)} 
+                          alt="preview" 
+                          className="h-32 w-auto object-contain rounded-xl border border-white shadow-sm bg-white/50 p-1" 
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
 
-                {uploadStatus[req.id] === "uploading" && <p className="text-xs text-blue-600 font-bold animate-pulse mt-2 flex items-center gap-1">上傳中，請稍候...</p>}
+                {uploadStatus[req.id] === "uploading" && <p className="text-xs text-blue-600 font-bold animate-pulse mt-2 flex items-center gap-1">檔案上傳中，請稍候...</p>}
                 {uploadStatus[req.id] === "success" && <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1">✅ 本次上傳成功！</p>}
                 {uploadStatus[req.id] === "error" && (
                   <div className="mt-2 text-xs text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 shadow-sm"><span className="font-bold block mb-1">❌ 上傳失敗：</span>{errorDetails[req.id] || "請檢查網路連線後重試"}</div>
