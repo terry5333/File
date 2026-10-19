@@ -97,10 +97,26 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
     } catch (error: any) { alert(`刪除失敗：${error.message}`); setLoading(false); }
   };
 
+  // 🌟 修復手機端按鈕無反應的問題：改用模擬 <a> 點擊
   const handlePreview = async (fileKey: string) => {
-    const res = await fetch("/api/sign/read", { method: "POST", body: JSON.stringify({ fileKey }) });
-    const data = await res.json();
-    window.open(data.url, "_blank");
+    try {
+      const res = await fetch("/api/sign/read", { method: "POST", body: JSON.stringify({ fileKey }) });
+      const data = await res.json();
+      
+      if (data.url) {
+        const link = document.createElement("a");
+        link.href = data.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer"; // 安全性設定
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert("無法取得預覽連結，請稍後再試。");
+      }
+    } catch (error) {
+       alert("發生錯誤，無法開啟預覽。");
+    }
   };
 
   const handleDownloadAll = async () => {
@@ -125,7 +141,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
   return (
     <div className="space-y-6 pb-20">
       
-      {/* 開關：暫停或開放上傳 */}
       <div className="bg-white/60 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] shadow-sm border border-white/80 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-slate-800">開放學生上傳</h3>
@@ -136,7 +151,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
         </button>
       </div>
 
-      {/* 檔案繳交項目設定 */}
       <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] shadow-sm border border-white/80">
         <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
           <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -169,7 +183,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
         </div>
       </div>
 
-      {/* 導師與小老師權限管理 */}
       <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] shadow-sm border border-white/80">
         <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
           <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -216,7 +229,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
         )}
       </div>
 
-      {/* 繳交看板 */}
       <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] shadow-sm border border-white/80">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <h2 className="text-xl font-bold text-slate-800">全班繳交狀況</h2>
