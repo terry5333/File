@@ -165,10 +165,21 @@ export default function StudentUploadPage({ params }: { params: { projectId: str
     if (!matchedStudent) {
       return (
         <form onSubmit={handleVerifyCode} className="space-y-6">
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <span className="px-3 py-1 bg-blue-100 text-blue-700 font-bold text-xs rounded-lg shadow-sm">學生繳交專區</span>
             <h1 className="text-2xl font-bold text-slate-800 mt-3">{project.name}</h1>
           </div>
+
+          {/* 🌟 新增：顯示該專案自訂的登入頁面提示字 */}
+          {project.loginHint && (
+            <div className="p-4 bg-amber-50/90 border border-amber-200/80 rounded-2xl text-amber-800 text-sm font-bold text-center shadow-sm flex items-center justify-center gap-2 whitespace-pre-wrap">
+              <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>{project.loginHint}</span>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-3 text-center">請輸入您的登入代號</label>
             <input
@@ -232,9 +243,9 @@ export default function StudentUploadPage({ params }: { params: { projectId: str
                   <div className="bg-emerald-50/80 border border-emerald-100 p-3 rounded-xl flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-bold text-emerald-700">✅ 之前已繳交</span>
-                      {/* 🌟 學生端也改成原生的 <a> 標籤 */}
+                      {/* 🌟 學生端也改成原生的 <a> 標籤，並加上 encodeURIComponent */}
                       <a 
-                        href={`/api/preview?fileKey=${existing.fileKey}`}
+                        href={`/api/preview?fileKey=${encodeURIComponent(existing.fileKey)}`}
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className="text-xs text-blue-600 hover:text-blue-800 font-bold border border-blue-200 bg-blue-50 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
