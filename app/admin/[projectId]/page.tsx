@@ -97,28 +97,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
     } catch (error: any) { alert(`刪除失敗：${error.message}`); setLoading(false); }
   };
 
-  // 🌟 修復手機端按鈕無反應的問題：改用模擬 <a> 點擊
-  const handlePreview = async (fileKey: string) => {
-    try {
-      const res = await fetch("/api/sign/read", { method: "POST", body: JSON.stringify({ fileKey }) });
-      const data = await res.json();
-      
-      if (data.url) {
-        const link = document.createElement("a");
-        link.href = data.url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer"; // 安全性設定
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        alert("無法取得預覽連結，請稍後再試。");
-      }
-    } catch (error) {
-       alert("發生錯誤，無法開啟預覽。");
-    }
-  };
-
   const handleDownloadAll = async () => {
     if (submissions.length === 0) return alert("目前無人繳交");
     const zip = new JSZip();
@@ -264,7 +242,8 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2">
                               <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md font-bold shadow-sm">✅ 已交</span>
-                              <button onClick={() => handlePreview(sub.fileKey)} className="text-xs text-blue-600 hover:text-blue-800 font-bold border border-blue-200 bg-blue-50 px-2 py-1 rounded-md transition-colors">預覽</button>
+                              {/* 🌟 改成原生的 <a> 標籤，點擊直接觸發後端跳轉，永不被擋 */}
+                              <a href={`/api/preview?fileKey=${sub.fileKey}`} target="_blank" rel="noopener noreferrer" className="inline-block text-xs text-blue-600 hover:text-blue-800 font-bold border border-blue-200 bg-blue-50 px-2 py-1 rounded-md transition-colors text-center">預覽</a>
                               <button onClick={() => handleReturnFile(student.code, req.id, sub.fileKey)} className="text-xs text-red-500 hover:text-red-700 font-bold border border-red-200 bg-red-50 px-2 py-1 rounded-md transition-colors">退回</button>
                             </div>
                             <span className="text-[11px] text-slate-400 font-mono ml-1">{new Date(sub.submittedAt).toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
