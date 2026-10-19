@@ -63,10 +63,26 @@ export default function TeacherProjectDashboardPage({ params }: { params: { proj
     fetchData();
   }, [params.projectId]);
 
+  // 🌟 修復手機端按鈕無反應的問題：改用模擬 <a> 點擊
   const handlePreview = async (fileKey: string) => {
-    const res = await fetch("/api/sign/read", { method: "POST", body: JSON.stringify({ fileKey }) });
-    const data = await res.json();
-    window.open(data.url, "_blank");
+    try {
+      const res = await fetch("/api/sign/read", { method: "POST", body: JSON.stringify({ fileKey }) });
+      const data = await res.json();
+      
+      if (data.url) {
+        const link = document.createElement("a");
+        link.href = data.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert("無法取得預覽連結，請稍後再試。");
+      }
+    } catch (error) {
+       alert("發生錯誤，無法開啟預覽。");
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-slate-50/50"></div>;
