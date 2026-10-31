@@ -13,7 +13,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 🌟 新增：登入頁面提示詞狀態
   const [loginHint, setLoginHint] = useState("");
   const [savingHint, setSavingHint] = useState(false);
 
@@ -32,7 +31,7 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
         if (snap.exists()) {
           const data = snap.data();
           setProject(data);
-          setLoginHint(data.loginHint || ""); // 讀取該專案已設定的登入提示字
+          setLoginHint(data.loginHint || "");
         }
 
         const subSnap = await getDocs(collection(db, "projects", params.projectId, "submissions"));
@@ -48,7 +47,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
     await updateDoc(doc(db, "projects", params.projectId), { isUploadEnabled: !newStatus });
   };
 
-  // 🌟 新增：儲存每個專案專屬的登入頁面提示字
   const handleSaveLoginHint = async () => {
     setSavingHint(true);
     try {
@@ -120,15 +118,30 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
     } catch (error: any) { alert(`刪除失敗：${error.message}`); setLoading(false); }
   };
 
+  // 🌟 修改：打包下載時，檔名統一改為 <姓名>_<座號>_<繳交的項目>.<副檔名>
   const handleDownloadAll = async () => {
     if (submissions.length === 0) return alert("目前無人繳交");
     const zip = new JSZip();
+    const reqList = project?.fileRequirements || [];
+
     for (const sub of submissions) {
       const res = await fetch("/api/sign/read", { method: "POST", body: JSON.stringify({ fileKey: sub.fileKey }) });
       const { url } = await res.json();
       const blob = await (await fetch(url)).blob();
-      zip.file(`${sub.studentSeat}_${sub.studentName}/${sub.filename}`, blob);
+
+      // 找出對應的繳交項目名稱
+      const matchedReq = reqList.find((r: any) => r.id === sub.reqId);
+      const reqTitle = matchedReq ? matchedReq.title : "未命名項目";
+
+      // 取得原始檔案的副檔名 (例如 .jpg, .pdf)
+      const lastDotIndex = sub.filename ? sub.filename.lastIndexOf(".") : -1;
+      const ext = lastDotIndex !== -1 ? sub.filename.substring(lastDotIndex) : "";
+
+      // 組合新檔名：<姓名>_<座號>_<繳交的項目>.<副檔名>
+      const newFileName = `${sub.studentName}_${sub.studentSeat}_${reqTitle}${ext}`;
+      zip.file(newFileName, blob);
     }
+
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, `${project.name}_全班作業.zip`);
   };
@@ -152,7 +165,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
         </button>
       </div>
 
-      {/* 🌟 新增區塊：每個專案專屬的「學生登入頁面提示字」設定 */}
       <div className="bg-white/60 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] shadow-sm border border-white/80">
         <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
           <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -294,7 +306,6 @@ export default function AdminProjectDashboardPage({ params }: { params: { projec
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2">
                               <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md font-bold shadow-sm">✅ 已交</span>
-                              {/* 🌟 改成原生的 <a> 標籤，點擊直接觸發後端跳轉，永不被擋 */}
                               <a href={`/api/preview?fileKey=${encodeURIComponent(sub.fileKey)}`} target="_blank" rel="noopener noreferrer" className="inline-block text-xs text-blue-600 hover:text-blue-800 font-bold border border-blue-200 bg-blue-50 px-2 py-1 rounded-md transition-colors text-center">預覽</a>
                               <button onClick={() => handleReturnFile(student.code, req.id, sub.fileKey)} className="text-xs text-red-500 hover:text-red-700 font-bold border border-red-200 bg-red-50 px-2 py-1 rounded-md transition-colors">退回</button>
                             </div>
